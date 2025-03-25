@@ -1,0 +1,36 @@
+{{define "card_fragment.html"}}
+<div class="kanban-card" id="card-{{.ID}}" data-id="{{.ID}}">
+  <h5>{{.Title}}</h5>
+  <p>{{.Description}}</p>
+  {{if .Subtasks}}
+    <ul>
+      {{range $line := split .Subtasks "\n"}}
+        {{$line = trim $line}}
+        {{if $line}}
+          {{$parts := split $line "|"}}
+          <li>
+            <i class="bi bi-check-square{{if eq (index $parts 0) "1"}}-fill{{end}}"></i>
+            {{index $parts 1}}
+          </li>
+        {{end}}
+      {{end}}
+    </ul>
+  {{end}}
+  <div class="mt-2">
+    <button class="btn btn-sm btn-secondary"
+      hx-get="/card/{{.ID}}/edit"
+      hx-target="#editCardModalContent"
+      hx-swap="innerHTML"
+      title="Edit">
+      <i class="bi bi-pencil"></i>
+    </button>
+    <button class="btn btn-sm btn-danger"
+      hx-post="/card/{{.ID}}/delete"
+      hx-target="#card-{{.ID}}"
+      hx-swap="delete"
+      title="Delete">
+      <i class="bi bi-trash"></i>
+    </button>
+  </div>
+</div>
+{{end}}

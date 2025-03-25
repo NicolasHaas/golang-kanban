@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kanban Board</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" integrity="sha512-t4GWSVZO1eC8BM339Xd7Uphw5s17a86tIZIj8qRxhnKub6WoyhnrxeCIMeAqBPgdZGlCcG2PrZjMc+Wr78+5Xg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" integrity="sha512-ZnR2wlLbSbr8/c9AgLg3jQPAattCUImNsae6NHYnS9KrIwRdcY9DxFotXhNAKIKbAXlRnujIqUWoXXwqyFOeIQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- htmx -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js" integrity="sha512-2kIcAizYXhIn8TzUvqzEDZNuDZ+aW7yE/+f1HJHXFjQcGNfv1kqzJSTBRBSlOgp6B/KZsz1K0a3ZTqP9dnxioQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- SortableJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" integrity="sha512-csIng5zcB+XpulRUa+ev1zKo7zRNGpEaVfNB9On1no9KYTEY/rLGAEEpvgdw6nim1WdTuihZY1eqZ31K7/fZjw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Bootstrap Bundle JS (for modals) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" integrity="sha512-7Pi/otdlbbCR+LnW+F7PwFcSDJOuUJB3OxtEHbg4vSMvzvJjde4Po1v4BR9Gdc9aXNUNFVUY+SK51wWT8WF0Gg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    html { overflow-y: scroll; }
+    .kanban-board { max-width: 1200px; margin: 0 auto; }
+    .kanban-column { 
+      border: 1px solid #ddd; padding: 10px; display: flex; flex-direction: column; height: 80vh; 
+    }
+    .cards-container { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; }
+    .kanban-card { 
+      background: #fff; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
+      position: relative;
+    }
+    .kanban-card h5 { margin-bottom: 0.5rem; }
+    .columns-row { display: flex; justify-content: center; gap: 20px; }
+    .kanban-card p { white-space: pre-wrap; }
+    /* Dynamic subtasks styles */
+    .subtasks-container { margin-bottom: 5px; }
+    .subtask-row { display: flex; gap: 5px; align-items: center; }
+    .subtask-row input.subtask-text { flex-grow: 1; }
+    input[type="checkbox"].subtask-complete { width: 1.2em; height: 1.2em; }
+  </style>
+</head>
+<body>
+<div class="container my-4">
+  <h1 class="text-center">Kanban Board</h1>
+  <!-- Global Add New Card Button -->
+  <div class="d-flex justify-content-center mb-4">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCardModal">Add New Card</button>
+  </div>
+  <div class="kanban-board">
+    <div class="columns-row">
+      <!-- To Do Column -->
+      <div class="col-md-4">
+        <h3 class="text-center">To Do</h3>
+        <div id="cards-todo" class="kanban-column cards-container">
+          {{range .todo}}
+            {{template "card_fragment.html" .}}
+          {{end}}
+        </div>
+      </div>
+      <!-- In Progress Column -->
+      <div class="col-md-4">
+        <h3 class="text-center">In Progress</h3>
+        <div id="cards-inprogress" class="kanban-column cards-container">
+          {{range .inprogress}}
+            {{template "card_fragment.html" .}}
+          {{end}}
+        </div>
+      </div>
+      <!-- Done Column -->
+      <div class="col-md-4">
+        <h3 class="text-center">Done</h3>
+        <div id="cards-done" class="kanban-column cards-container">
+          {{range .done}}
+            {{template "card_fragment.html" .}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Card Modal -->
+<div class="modal fade" id="addCardModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addCardForm" hx-post="/card" hx-target="#cards-todo" hx-swap="beforeend" onsubmit="return prepareSubtasks(this)">
+        <div class="modal-header">
+          <h5 class="modal-title">Add New Card</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="status" value="todo">
+          <div class="mb-2">
+            <input type="text" class="form-control" name="title" placeholder="Card Title" required>
+          </div>
+          <div class="mb-2">
+            <textarea class="form-control" name="description" placeholder="Description"></textarea>
+          </div>
+          <div class="mb-2">
+            <label>Subtasks</label>
+            <div class="subtasks-container"></div>
+            <button type="button" class="btn btn-secondary btn-sm add-subtask-btn">Add Subtask</button>
+            <input type="hidden" name="subtasks" class="subtasks-hidden">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Add Card</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Card Modal -->
+<div class="modal fade" id="editCardModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" id="editCardModalContent">
+      <!-- Edit form will be loaded here via HTMX -->
+    </div>
+  </div>
+</div>
+
+<script>
+  // Initialize SortableJS for each cards container.
+  ['cards-todo', 'cards-inprogress', 'cards-done'].forEach(function(id) {
+    var container = document.getElementById(id);
+    if (container) {
+      new Sortable(container, {
+        group: 'kanban',
+        animation: 150,
+        onEnd: function(evt) {
+          // Get destination container ordering.
+          let destContainer = evt.to;
+          let destCardIds = Array.from(destContainer.children)
+              .map(child => child.getAttribute('data-id'))
+              .filter(id => id !== null);
+          let destStatus = destContainer.id.split('-')[1];
+          // Update destination lane.
+          fetch("/card/order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: destStatus, order: destCardIds.map(Number) })
+          });
+          // If card moved from another lane, update the origin lane as well.
+          if (evt.from !== evt.to) {
+            let originContainer = evt.from;
+            let originCardIds = Array.from(originContainer.children)
+                .map(child => child.getAttribute('data-id'))
+                .filter(id => id !== null);
+            let originStatus = originContainer.id.split('-')[1];
+            fetch("/card/order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: originStatus, order: originCardIds.map(Number) })
+            });
+          }
+        }
+      });
+    }
+  });
+
+  // Function to initialize dynamic subtasks on a container.
+  function initSubtasks(container) {
+    container.addEventListener('click', function(e) {
+      let btn = e.target.closest('.remove-subtask-btn');
+      if (btn && container.contains(btn)) {
+        btn.closest('.subtask-row').remove();
+      }
+    });
+    const form = container.closest('form');
+    if (form) {
+      form.querySelectorAll('.add-subtask-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          const row = document.createElement('div');
+          row.className = 'subtask-row';
+          row.innerHTML = `
+            <input type="checkbox" class="subtask-complete">
+            <input type="text" class="form-control subtask-text" placeholder="Subtask description">
+            <button type="button" class="btn btn-danger btn-sm remove-subtask-btn" title="Remove">
+              <i class="bi bi-x"></i>
+            </button>
+          `;
+          container.appendChild(row);
+        });
+      });
+    }
+  }
+
+  // Function to collect subtasks data before form submission.
+  function prepareSubtasks(form) {
+    const container = form.querySelector('.subtasks-container');
+    const hidden = form.querySelector('.subtasks-hidden');
+    let subtasks = [];
+    container.querySelectorAll('.subtask-row').forEach(function(row) {
+      const complete = row.querySelector('.subtask-complete').checked ? "1" : "0";
+      const text = row.querySelector('.subtask-text').value.trim();
+      if (text !== "") {
+        subtasks.push(complete + "|" + text);
+      }
+    });
+    hidden.value = subtasks.join("\n");
+    return true;
+  }
+
+  // HTMX afterSwap handler.
+  document.body.addEventListener("htmx:afterSwap", function(evt) {
+    // If new card added (target is cards-todo), hide the Add Card modal and reset its form.
+    if (evt.detail.target.id === "cards-todo") {
+      var addModalEl = document.getElementById('addCardModal');
+      var addModal = bootstrap.Modal.getInstance(addModalEl);
+      if (addModal) { addModal.hide(); }
+      var form = document.getElementById('addCardForm');
+      if (form) {
+        form.reset();
+        const container = form.querySelector('.subtasks-container');
+        if (container) { container.innerHTML = ""; }
+      }
+    }
+    // If the edit form is loaded into the modal, show the modal and initialize subtasks.
+    if (evt.detail.target.id === "editCardModalContent") {
+      var editModal = new bootstrap.Modal(document.getElementById('editCardModal'));
+      editModal.show();
+      var container = document.getElementById('editCardModalContent').querySelector('.subtasks-container');
+      if (container) { initSubtasks(container); }
+    }
+    // After a card update (target id starts with "card-"), hide the edit modal.
+    if (evt.detail.target && evt.detail.target.id && evt.detail.target.id.startsWith("card-")) {
+      var editModalEl = document.getElementById('editCardModal');
+      var modalInstance = bootstrap.Modal.getInstance(editModalEl);
+      if (modalInstance) { modalInstance.hide(); }
+    }
+  });
+
+  // Initialize dynamic subtasks for the Add Card modal on page load.
+  document.addEventListener("DOMContentLoaded", function() {
+    var addForm = document.getElementById('addCardForm');
+    if (addForm) {
+      var container = addForm.querySelector('.subtasks-container');
+      if (container) { initSubtasks(container); }
+    }
+  });
+</script>
+</body>
+</html>

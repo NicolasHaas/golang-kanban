@@ -1,0 +1,42 @@
+{{define "card_edit_fragment.html"}}
+<div class="modal-header">
+  <h5 class="modal-title">Edit Card</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+  <form hx-post="/card/{{.ID}}/update" hx-target="#card-{{.ID}}" hx-swap="outerHTML" onsubmit="return prepareSubtasks(this)">
+    <div class="mb-2">
+      <label>Title</label>
+      <input type="text" class="form-control" name="title" value="{{.Title}}">
+    </div>
+    <div class="mb-2">
+      <label>Description</label>
+      <textarea class="form-control" name="description" rows="3">{{.Description}}</textarea>
+    </div>
+    <div class="mb-2">
+      <label>Subtasks</label>
+      <div class="subtasks-container">
+        {{range $line := split .Subtasks "\n"}}
+          {{$line = trim $line}}
+          {{if $line}}
+            {{$parts := split $line "|"}}
+            <div class="subtask-row">
+              <input type="checkbox" class="subtask-complete" {{if eq (index $parts 0) "1"}}checked{{end}}>
+              <input type="text" class="form-control subtask-text" value="{{index $parts 1}}">
+              <button type="button" class="btn btn-danger btn-sm remove-subtask-btn" title="Remove">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          {{end}}
+        {{end}}
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm add-subtask-btn">Add Subtask</button>
+      <input type="hidden" name="subtasks" class="subtasks-hidden">
+    </div>
+    <div class="modal-footer">
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+    </div>
+  </form>
+</div>
+{{end}}
