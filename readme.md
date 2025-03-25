@@ -32,20 +32,29 @@ docker run -p 17808:17808 ghcr.io/nicolashaas/golang-kanban:latest
 ### Prerequisites
 PostgreSQL: The only external dependency required. If you don’t have a PostgreSQL instance, you can easily run one using Docker.
 
-Create a PostgreSQL database and table. For example, using psql:
+Create a PostgreSQL database and table. That could look something like this:
 ``` sql
+-- Create user and database
+CREATE USER kanban WITH PASSWORD 'your_password_here';
+CREATE DATABASE kanban_db OWNER kanban;
 
-CREATE DATABASE kanban;
-\c kanban
+-- Connect to the new database (you'll need to do this manually in psql)
+-- \c kanban_db
 
-CREATE TABLE cards (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  subtasks TEXT,
-  status TEXT NOT NULL,
-  card_order INTEGER NOT NULL
+-- Once connected as postgres to kanban_db, transfer schema ownership
+GRANT ALL ON SCHEMA public TO kanban;
+ALTER SCHEMA public OWNER TO kanban;
+
+-- Connect as kanban user to kanban_db and run this to create the table
+CREATE TABLE IF NOT EXISTS cards (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    subtasks TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'todo',
+    card_order INTEGER NOT NULL DEFAULT 0
 );
+
 ```
 
 ### Environment Variables:
