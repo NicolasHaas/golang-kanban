@@ -17,6 +17,9 @@ It’s designed to be simple to deploy and maintain without the extra bloat of m
 - Dynamic Interactivity: Partial page updates using HTMX for a smooth user experience.
 - Drag-and-Drop: Rearrange cards effortlessly using SortableJS.
 
+### How it looks
+![Screenshot](assets/Screenshot_v1.0.0.png "Screenshot")
+
 ### Using Docker Compose
 A sample docker-compose.yml is provided, just use `docker-compose up --build`
 This command will build and run both the PostgreSQL and Kanban services.
