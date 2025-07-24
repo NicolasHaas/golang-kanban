@@ -13,6 +13,12 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const (
+	StatusTodo       = "todo"
+	StatusInProgress = "inprogress"
+	StatusDone       = "done"
+)
+
 type Card struct {
 	ID          int
 	Title       string
@@ -25,7 +31,6 @@ type Card struct {
 var db *sql.DB
 var tmpl *template.Template
 
-// OrderUpdatePayload is used for full ordering update.
 type OrderUpdatePayload struct {
 	Status string `json:"status"`
 	Order  []int  `json:"order"`
@@ -43,7 +48,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(1)
+
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 
 	funcMap := template.FuncMap{
 		"split": func(s, sep string) []string {
@@ -79,22 +92,36 @@ func getEnv(key, def string) string {
 	return v
 }
 
+func getCardByID(id int) (*Card, error) {
+	var card Card
+	err := db.QueryRow("SELECT id, title, description, subtasks, status, card_order FROM cards WHERE id=$1", id).
+		Scan(&card.ID, &card.Title, &card.Description, &card.Subtasks, &card.Status, &card.CardOrder)
+	if err != nil {
+		return nil, err
+	}
+	return &card, nil
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
 	cardsByStatus := map[string][]Card{
-		"todo":       {},
-		"inprogress": {},
-		"done":       {},
+		StatusTodo:       {},
+		StatusInProgress: {},
+		StatusDone:       {},
 	}
 	rows, err := db.Query("SELECT id, title, description, subtasks, status, card_order FROM cards ORDER BY status, card_order")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 	for rows.Next() {
 		var c Card
 		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Subtasks, &c.Status, &c.CardOrder); err != nil {
@@ -102,7 +129,9 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		cardsByStatus[c.Status] = append(cardsByStatus[c.Status], c)
 	}
-	tmpl.ExecuteTemplate(w, "index.html", cardsByStatus)
+	if err := tmpl.ExecuteTemplate(w, "index.html", cardsByStatus); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func createCardHandler(w http.ResponseWriter, r *http.Request) {
@@ -114,15 +143,24 @@ func createCardHandler(w http.ResponseWriter, r *http.Request) {
 	description := r.FormValue("description")
 	subtasks := r.FormValue("subtasks")
 	status := r.FormValue("status")
+
+	if status != StatusTodo && status != StatusInProgress && status != StatusDone {
+		status = StatusTodo // Default to todo
+	}
+
 	if strings.TrimSpace(title) == "" && strings.TrimSpace(description) == "" && strings.TrimSpace(subtasks) == "" {
 		http.Error(w, "Empty card not allowed", http.StatusBadRequest)
 		return
 	}
 	var maxOrder int
-	_ = db.QueryRow("SELECT COALESCE(MAX(card_order), 0) FROM cards WHERE status=$1", status).Scan(&maxOrder)
+	err := db.QueryRow("SELECT COALESCE(MAX(card_order), 0) FROM cards WHERE status=$1", status).Scan(&maxOrder)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	maxOrder++
 	var newID int
-	err := db.QueryRow("INSERT INTO cards (title, description, subtasks, status, card_order) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+	err = db.QueryRow("INSERT INTO cards (title, description, subtasks, status, card_order) VALUES ($1, $2, $3, $4, $5) RETURNING id",
 		title, description, subtasks, status, maxOrder).Scan(&newID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -130,7 +168,9 @@ func createCardHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	card := Card{ID: newID, Title: title, Description: description, Subtasks: subtasks, Status: status, CardOrder: maxOrder}
 	if r.Header.Get("HX-Request") != "" {
-		tmpl.ExecuteTemplate(w, "card_fragment.html", card)
+		if err := tmpl.ExecuteTemplate(w, "card_fragment.html", card); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -171,6 +211,12 @@ func moveCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 	newStatus := r.FormValue("status")
+
+	if newStatus != StatusTodo && newStatus != StatusInProgress && newStatus != StatusDone {
+		http.Error(w, "Invalid status", http.StatusBadRequest)
+		return
+	}
+
 	newOrder, err := strconv.Atoi(r.FormValue("order"))
 	if err != nil {
 		http.Error(w, "Invalid order", http.StatusBadRequest)
@@ -196,7 +242,9 @@ func moveCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte("OK"))
+	if _, err := w.Write([]byte("OK")); err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }
 
 func editCardHandler(w http.ResponseWriter, r *http.Request, id int) {
@@ -204,14 +252,14 @@ func editCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var card Card
-	err := db.QueryRow("SELECT id, title, description, subtasks, status, card_order FROM cards WHERE id=$1", id).
-		Scan(&card.ID, &card.Title, &card.Description, &card.Subtasks, &card.Status, &card.CardOrder)
+	card, err := getCardByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	tmpl.ExecuteTemplate(w, "card_edit_fragment.html", card)
+	if err := tmpl.ExecuteTemplate(w, "card_edit_fragment.html", card); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func updateCardHandler(w http.ResponseWriter, r *http.Request, id int) {
@@ -227,14 +275,14 @@ func updateCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var updated Card
-	err = db.QueryRow("SELECT id, title, description, subtasks, status, card_order FROM cards WHERE id=$1", id).
-		Scan(&updated.ID, &updated.Title, &updated.Description, &updated.Subtasks, &updated.Status, &updated.CardOrder)
+	updated, err := getCardByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	tmpl.ExecuteTemplate(w, "card_fragment.html", updated)
+	if err := tmpl.ExecuteTemplate(w, "card_fragment.html", updated); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func deleteCardHandler(w http.ResponseWriter, r *http.Request, id int) {
@@ -247,7 +295,9 @@ func deleteCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte("OK"))
+	if _, err := w.Write([]byte("OK")); err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }
 
 func viewCardHandler(w http.ResponseWriter, r *http.Request, id int) {
@@ -255,14 +305,14 @@ func viewCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	var card Card
-	err := db.QueryRow("SELECT id, title, description, subtasks, status, card_order FROM cards WHERE id=$1", id).
-		Scan(&card.ID, &card.Title, &card.Description, &card.Subtasks, &card.Status, &card.CardOrder)
+	card, err := getCardByID(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	tmpl.ExecuteTemplate(w, "card_fragment.html", card)
+	if err := tmpl.ExecuteTemplate(w, "card_fragment.html", card); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
@@ -283,5 +333,7 @@ func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.Write([]byte("OK"))
+	if _, err := w.Write([]byte("OK")); err != nil {
+		log.Printf("Error writing response: %v", err)
+	}
 }
