@@ -1,41 +1,47 @@
 {{define "card_edit_fragment.html"}}
-<div class="modal-header">
-  <h5 class="modal-title">Edit Card</h5>
-  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="p-6 border-b border-gray-200 dark:border-gray-600">
+  <div class="flex justify-between items-center">
+    <h5 class="text-xl font-bold text-gray-900 dark:text-white">Edit Card</h5>
+    <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onclick="hideModal('editCardModal')">
+      <i class="bi bi-x text-2xl"></i>
+    </button>
+  </div>
 </div>
-<div class="modal-body">
+<div class="p-6">
   <form hx-post="/card/{{.ID}}/update" hx-target="#card-{{.ID}}" hx-swap="outerHTML" onsubmit="return prepareSubtasks(this)">
-    <div class="mb-2">
-      <label>Title</label>
-      <input type="text" class="form-control" name="title" value="{{.Title}}">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+      <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" name="title" value="{{.Title}}">
     </div>
-    <div class="mb-2">
-      <label>Description</label>
-      <textarea class="form-control" name="description" rows="3">{{.Description}}</textarea>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+      <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" name="description" rows="3">{{.Description}}</textarea>
     </div>
-    <div class="mb-2">
-      <label>Subtasks</label>
-      <div class="subtasks-container">
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtasks</label>
+      <div class="subtasks-container space-y-2">
         {{range $line := split .Subtasks "\n"}}
           {{$line = trim $line}}
           {{if $line}}
             {{$parts := split $line "|"}}
-            <div class="subtask-row">
-              <input type="checkbox" class="subtask-complete" {{if eq (index $parts 0) "1"}}checked{{end}}>
-              <input type="text" class="form-control subtask-text" value="{{index $parts 1}}">
-              <button type="button" class="btn btn-danger btn-sm remove-subtask-btn" title="Remove">
-                <i class="bi bi-x"></i>
+            <div class="subtask-row flex items-center space-x-2 mb-2">
+              <input type="checkbox" class="subtask-complete w-4 h-4 text-blue-600 rounded focus:ring-blue-500" {{if eq (index $parts 0) "1"}}checked{{end}}>
+              <input type="text" class="subtask-text flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" value="{{index $parts 1}}">
+              <button type="button" class="remove-subtask-btn text-red-500 hover:text-red-700 p-1" title="Remove">
+                <i class="bi bi-x text-lg"></i>
               </button>
             </div>
           {{end}}
         {{end}}
       </div>
-      <button type="button" class="btn btn-secondary btn-sm add-subtask-btn">Add Subtask</button>
+      <button type="button" class="mt-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm add-subtask-btn">
+        <i class="bi bi-plus mr-1"></i>Add Subtask
+      </button>
       <input type="hidden" name="subtasks" class="subtasks-hidden">
     </div>
-    <div class="modal-footer">
-      <button type="submit" class="btn btn-primary btn-sm">Save</button>
-      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+      <button type="button" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg" onclick="hideModal('editCardModal')">Cancel</button>
+      <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Save</button>
     </div>
   </form>
 </div>

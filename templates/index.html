@@ -1,70 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html class="h-full">
 <head>
   <meta charset="UTF-8">
   <title>Kanban Board</title>
-  <!-- Bootstrap CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" integrity="sha512-t4GWSVZO1eC8BM339Xd7Uphw5s17a86tIZIj8qRxhnKub6WoyhnrxeCIMeAqBPgdZGlCcG2PrZjMc+Wr78+5Xg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {}
+      }
+    }
+  </script>
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" integrity="sha512-ZnR2wlLbSbr8/c9AgLg3jQPAattCUImNsae6NHYnS9KrIwRdcY9DxFotXhNAKIKbAXlRnujIqUWoXXwqyFOeIQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <!-- htmx -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js" integrity="sha512-2kIcAizYXhIn8TzUvqzEDZNuDZ+aW7yE/+f1HJHXFjQcGNfv1kqzJSTBRBSlOgp6B/KZsz1K0a3ZTqP9dnxioQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <!-- SortableJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" integrity="sha512-csIng5zcB+XpulRUa+ev1zKo7zRNGpEaVfNB9On1no9KYTEY/rLGAEEpvgdw6nim1WdTuihZY1eqZ31K7/fZjw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- Bootstrap Bundle JS (for modals) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js" integrity="sha512-7Pi/otdlbbCR+LnW+F7PwFcSDJOuUJB3OxtEHbg4vSMvzvJjde4Po1v4BR9Gdc9aXNUNFVUY+SK51wWT8WF0Gg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
-    html { overflow-y: scroll; }
-    .kanban-board { max-width: 1200px; margin: 0 auto; }
-    .kanban-column { 
-      border: 1px solid #ddd; padding: 10px; display: flex; flex-direction: column; height: 80vh; 
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
     }
-    .cards-container { flex-grow: 1; overflow-y: auto; margin-bottom: 10px; }
-    .kanban-card { 
-      background: #fff; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
-      position: relative;
+    .modal.show {
+      display: flex;
     }
-    .kanban-card h5 { margin-bottom: 0.5rem; }
-    .columns-row { display: flex; justify-content: center; gap: 20px; }
-    .kanban-card p { white-space: pre-wrap; }
-    /* Dynamic subtasks styles */
-    .subtasks-container { margin-bottom: 5px; }
-    .subtask-row { display: flex; gap: 5px; align-items: center; }
-    .subtask-row input.subtask-text { flex-grow: 1; }
-    input[type="checkbox"].subtask-complete { width: 1.2em; height: 1.2em; }
+    .modal-dialog {
+      max-width: 500px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+    .dark .modal-content {
+      background: #374151;
+      color: white;
+    }
   </style>
 </head>
-<body>
-<div class="container my-4">
-  <h1 class="text-center">Kanban Board</h1>
-  <!-- Global Add New Card Button -->
-  <div class="d-flex justify-content-center mb-4">
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCardModal">Add New Card</button>
+<body class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+<div class="container mx-auto py-8 px-4">
+  <!-- Header with title and dark mode toggle -->
+  <div class="flex justify-between items-center mb-8">
+    <h1 class="text-4xl font-bold text-center flex-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+      Kanban Board
+    </h1>
+    <button 
+      id="darkModeToggle" 
+      class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+      title="Toggle dark mode"
+    >
+      <i class="bi bi-sun text-xl dark:hidden"></i>
+      <i class="bi bi-moon text-xl hidden dark:inline"></i>
+    </button>
   </div>
-  <div class="kanban-board">
-    <div class="columns-row">
+  
+  <!-- Global Add New Card Button -->
+  <div class="flex justify-center mb-8">
+    <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105" onclick="showModal('addCardModal')">
+      <i class="bi bi-plus mr-2"></i>Add New Card
+    </button>
+  </div>
+  
+  <div class="max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <!-- To Do Column -->
-      <div class="col-md-4">
-        <h3 class="text-center">To Do</h3>
-        <div id="cards-todo" class="kanban-column cards-container">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
+          <i class="bi bi-clock text-yellow-500 mr-2"></i>To Do
+        </h3>
+        <div id="cards-todo" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
           {{range .todo}}
             {{template "card_fragment.html" .}}
           {{end}}
         </div>
       </div>
+      
       <!-- In Progress Column -->
-      <div class="col-md-4">
-        <h3 class="text-center">In Progress</h3>
-        <div id="cards-inprogress" class="kanban-column cards-container">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
+          <i class="bi bi-arrow-repeat text-blue-500 mr-2"></i>In Progress
+        </h3>
+        <div id="cards-inprogress" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
           {{range .inprogress}}
             {{template "card_fragment.html" .}}
           {{end}}
         </div>
       </div>
+      
       <!-- Done Column -->
-      <div class="col-md-4">
-        <h3 class="text-center">Done</h3>
-        <div id="cards-done" class="kanban-column cards-container">
+      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
+          <i class="bi bi-check-circle text-green-500 mr-2"></i>Done
+        </h3>
+        <div id="cards-done" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
           {{range .done}}
             {{template "card_fragment.html" .}}
           {{end}}
@@ -75,32 +118,40 @@
 </div>
 
 <!-- Add Card Modal -->
-<div class="modal fade" id="addCardModal" tabindex="-1" aria-hidden="true">
+<div class="modal" id="addCardModal">
   <div class="modal-dialog">
     <div class="modal-content">
       <form id="addCardForm" hx-post="/card" hx-target="#cards-todo" hx-swap="beforeend" onsubmit="return prepareSubtasks(this)">
-        <div class="modal-header">
-          <h5 class="modal-title">Add New Card</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="p-6 border-b border-gray-200 dark:border-gray-600">
+          <div class="flex justify-between items-center">
+            <h5 class="text-xl font-bold text-gray-900 dark:text-white">Add New Card</h5>
+            <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onclick="hideModal('addCardModal')">
+              <i class="bi bi-x text-2xl"></i>
+            </button>
+          </div>
         </div>
-        <div class="modal-body">
+        <div class="p-6">
           <input type="hidden" name="status" value="todo">
-          <div class="mb-2">
-            <input type="text" class="form-control" name="title" placeholder="Card Title" required>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+            <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" name="title" placeholder="Card Title" required>
           </div>
-          <div class="mb-2">
-            <textarea class="form-control" name="description" placeholder="Description"></textarea>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+            <textarea class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" name="description" placeholder="Description" rows="3"></textarea>
           </div>
-          <div class="mb-2">
-            <label>Subtasks</label>
-            <div class="subtasks-container"></div>
-            <button type="button" class="btn btn-secondary btn-sm add-subtask-btn">Add Subtask</button>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtasks</label>
+            <div class="subtasks-container space-y-2"></div>
+            <button type="button" class="mt-2 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm add-subtask-btn">
+              <i class="bi bi-plus mr-1"></i>Add Subtask
+            </button>
             <input type="hidden" name="subtasks" class="subtasks-hidden">
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Add Card</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <div class="p-6 border-t border-gray-200 dark:border-gray-600 flex justify-end space-x-3">
+          <button type="button" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-lg" onclick="hideModal('addCardModal')">Cancel</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">Add Card</button>
         </div>
       </form>
     </div>
@@ -108,7 +159,7 @@
 </div>
 
 <!-- Edit Card Modal -->
-<div class="modal fade" id="editCardModal" tabindex="-1" aria-hidden="true">
+<div class="modal" id="editCardModal">
   <div class="modal-dialog">
     <div class="modal-content" id="editCardModalContent">
       <!-- Edit form will be loaded here via HTMX -->
@@ -117,6 +168,39 @@
 </div>
 
 <script>
+  // Dark mode functionality
+  function initDarkMode() {
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const html = document.documentElement;
+    
+    // Check for saved preference or default to light mode
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      html.classList.add('dark');
+    }
+    
+    darkModeToggle.addEventListener('click', () => {
+      html.classList.toggle('dark');
+      localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+    });
+  }
+
+  // Modal functionality
+  function showModal(modalId) {
+    document.getElementById(modalId).classList.add('show');
+  }
+  
+  function hideModal(modalId) {
+    document.getElementById(modalId).classList.remove('show');
+  }
+  
+  // Close modal when clicking outside
+  document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.remove('show');
+    }
+  });
+
   // Initialize SortableJS for each cards container.
   ['cards-todo', 'cards-inprogress', 'cards-done'].forEach(function(id) {
     var container = document.getElementById(id);
@@ -168,12 +252,12 @@
       form.querySelectorAll('.add-subtask-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
           const row = document.createElement('div');
-          row.className = 'subtask-row';
+          row.className = 'subtask-row flex items-center space-x-2 mb-2';
           row.innerHTML = `
-            <input type="checkbox" class="subtask-complete">
-            <input type="text" class="form-control subtask-text" placeholder="Subtask description">
-            <button type="button" class="btn btn-danger btn-sm remove-subtask-btn" title="Remove">
-              <i class="bi bi-x"></i>
+            <input type="checkbox" class="subtask-complete w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+            <input type="text" class="subtask-text flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="Subtask description">
+            <button type="button" class="remove-subtask-btn text-red-500 hover:text-red-700 p-1" title="Remove">
+              <i class="bi bi-x text-lg"></i>
             </button>
           `;
           container.appendChild(row);
@@ -202,9 +286,7 @@
   document.body.addEventListener("htmx:afterSwap", function(evt) {
     // If new card added (target is cards-todo), hide the Add Card modal and reset its form.
     if (evt.detail.target.id === "cards-todo") {
-      var addModalEl = document.getElementById('addCardModal');
-      var addModal = bootstrap.Modal.getInstance(addModalEl);
-      if (addModal) { addModal.hide(); }
+      hideModal('addCardModal');
       var form = document.getElementById('addCardForm');
       if (form) {
         form.reset();
@@ -214,21 +296,19 @@
     }
     // If the edit form is loaded into the modal, show the modal and initialize subtasks.
     if (evt.detail.target.id === "editCardModalContent") {
-      var editModal = new bootstrap.Modal(document.getElementById('editCardModal'));
-      editModal.show();
+      showModal('editCardModal');
       var container = document.getElementById('editCardModalContent').querySelector('.subtasks-container');
       if (container) { initSubtasks(container); }
     }
     // After a card update (target id starts with "card-"), hide the edit modal.
     if (evt.detail.target && evt.detail.target.id && evt.detail.target.id.startsWith("card-")) {
-      var editModalEl = document.getElementById('editCardModal');
-      var modalInstance = bootstrap.Modal.getInstance(editModalEl);
-      if (modalInstance) { modalInstance.hide(); }
+      hideModal('editCardModal');
     }
   });
 
-  // Initialize dynamic subtasks for the Add Card modal on page load.
+  // Initialize everything on page load.
   document.addEventListener("DOMContentLoaded", function() {
+    initDarkMode();
     var addForm = document.getElementById('addCardForm');
     if (addForm) {
       var container = addForm.querySelector('.subtasks-container');
