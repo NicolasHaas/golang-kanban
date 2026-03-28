@@ -1,32 +1,86 @@
 {{define "card_fragment.html"}}
-<div class="bg-white dark:bg-gray-700 rounded-lg p-4 shadow-md border border-gray-200 dark:border-gray-600 cursor-move hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]" id="card-{{.ID}}" data-id="{{.ID}}">
-  <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{.Title}}</h5>
-  {{if .Description}}
-    <p class="text-gray-600 dark:text-gray-300 text-sm mb-3 whitespace-pre-wrap">{{.Description}}</p>
-  {{end}}
-  {{if .Subtasks}}
-    <ul class="space-y-1 mb-3">
-      {{range $line := split .Subtasks "\n"}}
-        {{$line = trim $line}}
-        {{if $line}}
-          {{$parts := split $line "|"}}
-          <li class="flex items-center text-sm">
-            <i class="bi bi-check-square{{if eq (index $parts 0) "1"}}-fill text-green-500{{else}} text-gray-400{{end}} mr-2"></i>
-            <span class="{{if eq (index $parts 0) "1"}}line-through text-gray-500{{else}}text-gray-700 dark:text-gray-300{{end}}">{{index $parts 1}}</span>
+<div class="bg-white dark:bg-gray-700 rounded-lg px-2 pt-2 pb-1 shadow-md border border-gray-200 dark:border-gray-600 cursor-move hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]" id="card-{{.ID}}" data-id="{{.ID}}">
+
+  <!-- Header: title + minimize/maximize button (subtask cards only) -->
+  <div class="flex items-start justify-between gap-2 mb-2">
+    <h5 class="text-lg font-semibold text-gray-900 dark:text-white flex-1 leading-tight">{{.Title}}</h5>
+
+    {{if hasSubtasks .Subtasks}}
+    <button
+      type="button"
+      class="p-1 text-gray-400 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white rounded transition-colors duration-200 shrink-0"
+      aria-label="Toggle card"
+      title="Minimize / Maximize"
+      onclick="(function(btn){
+        const card = btn.closest('[data-id]');
+        if (!card) return;
+        const body = card.querySelector('.card-body');
+        const icon = btn.querySelector('i');
+        if (!body || !icon) return;
+        body.classList.toggle('hidden');
+        if (body.classList.contains('hidden')) {
+          icon.classList.remove('bi-dash-square');
+          icon.classList.add('bi-plus-square');
+        } else {
+          icon.classList.remove('bi-plus-square');
+          icon.classList.add('bi-dash-square');
+        }
+      })(this)"
+    >
+      <i class="bi bi-dash-square text-sm"></i>
+    </button>
+    {{end}}
+  </div>
+
+  <!-- Card body: description + subtasks (hidden when minimized) -->
+  <div class="card-body">
+    {{if .Description}}
+      <p class="text-gray-600 dark:text-gray-300 text-sm mb-3 whitespace-pre-wrap break-words">{{.Description}}</p>
+    {{end}}
+
+    {{if hasSubtasks .Subtasks}}
+      <ul class="space-y-1 mb-3">
+        {{range $i, $subtask := parseSubtasks .Subtasks}}
+          <li class="flex items-center text-sm cursor-pointer no-drag"
+            hx-post="/card/{{$.ID}}/subtask/{{$i}}"
+            hx-target="#card-{{$.ID}}"
+            hx-swap="outerHTML">
+            {{if $subtask.Completed}}
+              <i class="bi bi-check-square-fill text-green-500 mr-2"></i>
+              <span class="line-through text-gray-500">{{$subtask.Text}}</span>
+            {{else}}
+              <i class="bi bi-square text-gray-400 mr-2"></i>
+              <span class="text-gray-700 dark:text-gray-300">{{$subtask.Text}}</span>
+            {{end}}
           </li>
         {{end}}
-      {{end}}
-    </ul>
-  {{end}}
-  <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-600">
-    <button class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors duration-200"
+      </ul>
+    {{end}}
+  </div>
+
+  <!-- Bottom bar: always visible -->
+  <div class="flex justify-between items-center pt-1 border-t border-gray-100 dark:border-gray-600">
+    <button class="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors duration-200"
       hx-get="/card/{{.ID}}/edit"
       hx-target="#editCardModalContent"
       hx-swap="innerHTML"
       title="Edit">
       <i class="bi bi-pencil text-sm"></i>
     </button>
-    <button class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
+
+    <div class="flex items-center justify-center min-w-[1.5rem]">
+      {{if hasSubtasks .Subtasks}}
+        {{if allSubtasksComplete .Subtasks}}
+          <i class="bi bi-check-square-fill text-green-500 text-base" title="All subtasks complete"></i>
+        {{else}}
+          <i class="bi bi-square text-gray-400 dark:text-gray-300 text-base" title="Subtasks incomplete"></i>
+        {{end}}
+      {{else}}
+        <span class="w-4"></span>
+      {{end}}
+    </div>
+
+    <button class="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
       hx-post="/card/{{.ID}}/delete"
       hx-target="#card-{{.ID}}"
       hx-swap="delete"
@@ -34,5 +88,6 @@
       <i class="bi bi-trash text-sm"></i>
     </button>
   </div>
+
 </div>
 {{end}}

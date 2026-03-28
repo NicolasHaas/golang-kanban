@@ -1,0 +1,57 @@
+{{define "board_fragment.html"}}
+<div id="board" class="max-w-7xl mx-auto space-y-4">
+  {{range .Rows}}
+  {{$cat := .Category}}
+  <section class="bg-gray-200 dark:bg-gray-800/40 rounded-xl shadow-md">
+    <div class="flex items-center justify-between px-4 py-2">
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          onclick="toggleBoardRow('{{$cat.Slug}}')"
+          class="text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          title="Toggle {{$cat.Name}}"
+        >
+          <i id="toggle-icon-{{$cat.Slug}}" class="bi bi-chevron-right text-sm"></i>
+        </button>
+        <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{$cat.Name}}</h2>
+      </div>
+    </div>
+
+    <div id="row-{{$cat.Slug}}" class="px-2 pb-3 hidden">
+      <div class="grid {{colGridClass .ColCount}} gap-6">
+        {{range .Columns}}
+        {{$st := .Status}}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <div class="flex items-center justify-between mb-4 border-b border-gray-200 dark:border-gray-600 pb-2">
+            <h3 class="text-xl font-bold text-gray-700 dark:text-gray-300">
+              {{if eq $st.Slug "tomorrow"}}<i class="bi bi-calendar-day text-orange-500 mr-2"></i>{{end}}
+              {{if eq $st.Slug "todo"}}<i class="bi bi-clock text-yellow-500 mr-2"></i>{{end}}
+              {{if eq $st.Slug "inprogress"}}<i class="bi bi-arrow-repeat text-blue-500 mr-2"></i>{{end}}
+              {{if eq $st.Slug "needsfeedback"}}<i class="bi bi-chat-left-dots text-purple-500 mr-2"></i>{{end}}
+              {{if eq $st.Slug "done"}}<i class="bi bi-check-circle text-green-500 mr-2"></i>{{end}}
+              {{$st.Name}}
+            </h3>
+            {{if eq $st.Slug "done"}}
+            <button
+              type="button"
+              onclick="clearDoneColumn('{{$cat.Slug}}')"
+              title="Clear Done"
+              class="text-red-500 hover:text-red-700 transition-colors duration-200"
+            >
+              <i class="bi bi-trash text-lg"></i>
+            </button>
+            {{end}}
+          </div>
+          <div id="cards-{{$cat.Slug}}-{{$st.Slug}}" data-category="{{$cat.Slug}}" data-status="{{$st.Slug}}" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
+            {{range .Cards}}
+              {{template "card_fragment.html" .}}
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </section>
+  {{end}}
+</div>
+{{end}}

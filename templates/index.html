@@ -1,9 +1,9 @@
+{{define "index.html"}}
 <!DOCTYPE html>
 <html class="h-full">
 <head>
   <meta charset="UTF-8">
   <title>Kanban Board</title>
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -13,11 +13,8 @@
       }
     }
   </script>
-  <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css" integrity="sha512-ZnR2wlLbSbr8/c9AgLg3jQPAattCUImNsae6NHYnS9KrIwRdcY9DxFotXhNAKIKbAXlRnujIqUWoXXwqyFOeIQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <!-- htmx -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js" integrity="sha512-2kIcAizYXhIn8TzUvqzEDZNuDZ+aW7yE/+f1HJHXFjQcGNfv1kqzJSTBRBSlOgp6B/KZsz1K0a3ZTqP9dnxioQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- SortableJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js" integrity="sha512-csIng5zcB+XpulRUa+ev1zKo7zRNGpEaVfNB9On1no9KYTEY/rLGAEEpvgdw6nim1WdTuihZY1eqZ31K7/fZjw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     .modal {
@@ -54,74 +51,39 @@
 </head>
 <body class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
 <div class="container mx-auto py-8 px-4">
-  <!-- Header with title and dark mode toggle -->
-  <div class="flex justify-between items-center mb-8">
-    <h1 class="text-4xl font-bold text-center flex-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-      Kanban Board
-    </h1>
-    <button 
-      id="darkModeToggle" 
-      class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
-      title="Toggle dark mode"
-    >
-      <i class="bi bi-sun text-xl dark:hidden"></i>
-      <i class="bi bi-moon text-xl hidden dark:inline"></i>
-    </button>
-  </div>
-  
-  <!-- Global Add New Card Button -->
-  <div class="flex justify-center mb-8">
+  <div class="relative flex justify-center items-center mb-8">
+    <span class="absolute left-0 pl-2 text-xl font-bold text-gray-900 dark:text-white">Kanban Board</span>
     <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105" onclick="showModal('addCardModal')">
       <i class="bi bi-plus mr-2"></i>Add New Card
     </button>
-  </div>
-  
-  <div class="max-w-7xl mx-auto">
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <!-- To Do Column -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
-          <i class="bi bi-clock text-yellow-500 mr-2"></i>To Do
-        </h3>
-        <div id="cards-todo" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
-          {{range .todo}}
-            {{template "card_fragment.html" .}}
-          {{end}}
-        </div>
-      </div>
-      
-      <!-- In Progress Column -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
-          <i class="bi bi-arrow-repeat text-blue-500 mr-2"></i>In Progress
-        </h3>
-        <div id="cards-inprogress" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
-          {{range .inprogress}}
-            {{template "card_fragment.html" .}}
-          {{end}}
-        </div>
-      </div>
-      
-      <!-- Done Column -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-center mb-4 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
-          <i class="bi bi-check-circle text-green-500 mr-2"></i>Done
-        </h3>
-        <div id="cards-done" class="space-y-3 min-h-[500px] overflow-y-auto max-h-[70vh] pr-2">
-          {{range .done}}
-            {{template "card_fragment.html" .}}
-          {{end}}
-        </div>
-      </div>
+
+    <div class="absolute right-0 flex items-center gap-2">
+      <button
+        onclick="showModal('settingsModal')"
+        class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+        title="Board settings"
+      >
+        <i class="bi bi-gear text-xl"></i>
+      </button>
+      <button
+        id="darkModeToggle"
+        class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+        title="Toggle dark mode"
+      >
+        <i class="bi bi-sun text-xl dark:hidden"></i>
+        <i class="bi bi-moon text-xl hidden dark:inline"></i>
+      </button>
     </div>
   </div>
+
+  {{template "board_fragment.html" .}}
 </div>
 
 <!-- Add Card Modal -->
 <div class="modal" id="addCardModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form id="addCardForm" hx-post="/card" hx-target="#cards-todo" hx-swap="beforeend" onsubmit="return prepareSubtasks(this)">
+      <form id="addCardForm" hx-post="/card" hx-target="#cards-work-todo" hx-swap="beforeend" onsubmit="return prepareSubtasks(this)">
         <div class="p-6 border-b border-gray-200 dark:border-gray-600">
           <div class="flex justify-between items-center">
             <h5 class="text-xl font-bold text-gray-900 dark:text-white">Add New Card</h5>
@@ -132,6 +94,16 @@
         </div>
         <div class="p-6">
           <input type="hidden" name="status" value="todo">
+
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Board</label>
+            <select name="category" id="addCardCategory" onchange="updateAddCardTarget()" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+              {{range .Categories}}
+              <option value="{{.Slug}}">{{.Name}}</option>
+              {{end}}
+            </select>
+          </div>
+
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
             <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white" name="title" placeholder="Card Title" required>
@@ -167,154 +139,534 @@
   </div>
 </div>
 
+<!-- Settings Modal -->
+<div class="modal" id="settingsModal">
+  <div class="modal-dialog" style="max-width:640px">
+    <div class="modal-content">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-600">
+        <div class="flex justify-between items-center">
+          <h5 class="text-xl font-bold text-gray-900 dark:text-white">Board Settings</h5>
+          <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onclick="hideModal('settingsModal')">
+            <i class="bi bi-x text-2xl"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-6">
+
+        <!-- Rows (Categories) -->
+        <div>
+          <h6 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Rows</h6>
+          <ul id="settings-rows-list" class="space-y-2 mb-3">
+            {{range .Categories}}
+            <li class="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2" data-slug="{{.Slug}}">
+              {{if not .Locked}}
+              <i class="bi bi-grip-vertical text-gray-400 cursor-grab settings-drag-handle"></i>
+              {{else}}
+              <i class="bi bi-lock text-gray-300 dark:text-gray-500 text-sm"></i>
+              {{end}}
+              <span class="flex-1 text-sm text-gray-800 dark:text-gray-200">{{.Name}}</span>
+              {{if not .Locked}}
+              <button
+                type="button"
+                onclick="promptRenameCategory('{{.Slug}}', '{{.Name}}')"
+                class="text-gray-400 hover:text-blue-600 transition-colors"
+                title="Rename"
+              ><i class="bi bi-pencil text-sm"></i></button>
+              <button
+                type="button"
+                onclick="promptDeleteCategory('{{.Slug}}', '{{.Name}}')"
+                class="text-gray-400 hover:text-red-600 transition-colors"
+                title="Delete"
+              ><i class="bi bi-trash text-sm"></i></button>
+              {{end}}
+            </li>
+            {{end}}
+          </ul>
+          <form onsubmit="submitAddCategory(event)" class="flex gap-2">
+            <input
+              type="text"
+              id="newCategoryName"
+              placeholder="New row name"
+              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">Add</button>
+          </form>
+        </div>
+
+        <hr class="border-gray-200 dark:border-gray-600">
+
+        <!-- Columns (Statuses) -->
+        <div>
+          <h6 class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">Columns</h6>
+          <ul id="settings-cols-list" class="space-y-2 mb-3">
+            {{range .Statuses}}
+            <li class="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-3 py-2" data-slug="{{.Slug}}">
+              {{if not .Locked}}
+              <i class="bi bi-grip-vertical text-gray-400 cursor-grab settings-drag-handle"></i>
+              {{else}}
+              <i class="bi bi-lock text-gray-300 dark:text-gray-500 text-sm"></i>
+              {{end}}
+              <span class="flex-1 text-sm text-gray-800 dark:text-gray-200">{{.Name}}</span>
+              {{if not .Locked}}
+              <button
+                type="button"
+                onclick="promptRenameStatus('{{.Slug}}', '{{.Name}}')"
+                class="text-gray-400 hover:text-blue-600 transition-colors"
+                title="Rename"
+              ><i class="bi bi-pencil text-sm"></i></button>
+              <button
+                type="button"
+                onclick="promptDeleteStatus('{{.Slug}}', '{{.Name}}')"
+                class="text-gray-400 hover:text-red-600 transition-colors"
+                title="Delete"
+              ><i class="bi bi-trash text-sm"></i></button>
+              {{end}}
+            </li>
+            {{end}}
+          </ul>
+          <form onsubmit="submitAddStatus(event)" class="flex gap-2">
+            <input
+              type="text"
+              id="newStatusName"
+              placeholder="New column name"
+              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm">Add</button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete-with-cards confirmation modal -->
+<div class="modal" id="deleteWithCardsModal">
+  <div class="modal-dialog" style="max-width:400px">
+    <div class="modal-content p-6 space-y-4">
+      <h5 class="text-lg font-bold text-gray-900 dark:text-white" id="deleteWithCardsTitle">Move cards before deleting</h5>
+      <p class="text-sm text-gray-600 dark:text-gray-300" id="deleteWithCardsMsg"></p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Move cards to:</label>
+        <select id="deleteWithCardsMoveTo" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"></select>
+      </div>
+      <div class="flex justify-end gap-3 pt-2">
+        <button type="button" onclick="hideModal('deleteWithCardsModal')" class="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 rounded-lg text-sm">Cancel</button>
+        <button type="button" id="deleteWithCardsConfirm" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Move &amp; Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-  // Dark mode functionality
+  // ---------------------------------------------------------------------------
+  // Board reload helper
+  // ---------------------------------------------------------------------------
+  function reloadBoard() {
+    fetch('/board')
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        var boardEl = document.getElementById('board');
+        if (!boardEl) return;
+        boardEl.outerHTML = html;
+        initSortable();
+        initCardMinimize();
+      });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dark mode
+  // ---------------------------------------------------------------------------
   function initDarkMode() {
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const html = document.documentElement;
-    
-    // Check for saved preference or default to light mode
-    const savedTheme = localStorage.getItem('theme');
+    var darkModeToggle = document.getElementById('darkModeToggle');
+    var html = document.documentElement;
+    var savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       html.classList.add('dark');
     }
-    
-    darkModeToggle.addEventListener('click', () => {
+    darkModeToggle.addEventListener('click', function() {
       html.classList.toggle('dark');
       localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
     });
   }
 
-  // Modal functionality
+  // ---------------------------------------------------------------------------
+  // Modals
+  // ---------------------------------------------------------------------------
   function showModal(modalId) {
     document.getElementById(modalId).classList.add('show');
   }
-  
+
   function hideModal(modalId) {
     document.getElementById(modalId).classList.remove('show');
   }
-  
-  // Close modal when clicking outside
+
   document.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal')) {
       e.target.classList.remove('show');
     }
   });
 
-  // Initialize SortableJS for each cards container.
-  ['cards-todo', 'cards-inprogress', 'cards-done'].forEach(function(id) {
-    var container = document.getElementById(id);
-    if (container) {
-      new Sortable(container, {
-        group: 'kanban',
+  // ---------------------------------------------------------------------------
+  // Add card form
+  // ---------------------------------------------------------------------------
+  function updateAddCardTarget() {
+    var form = document.getElementById('addCardForm');
+    var category = document.getElementById('addCardCategory').value;
+    form.setAttribute('hx-target', '#cards-' + category + '-todo');
+    htmx.process(form);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Board row toggle
+  // ---------------------------------------------------------------------------
+  function toggleBoardRow(category) {
+    var row = document.getElementById('row-' + category);
+    var icon = document.getElementById('toggle-icon-' + category);
+    if (!row || !icon) return;
+    row.classList.toggle('hidden');
+    if (row.classList.contains('hidden')) {
+      icon.classList.remove('bi-chevron-down');
+      icon.classList.add('bi-chevron-right');
+    } else {
+      icon.classList.remove('bi-chevron-right');
+      icon.classList.add('bi-chevron-down');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Clear done column
+  // ---------------------------------------------------------------------------
+  function clearDoneColumn(category) {
+    if (!confirm('Delete all cards in Done for this row?')) return;
+    var doneContainer = document.getElementById('cards-' + category + '-done');
+    if (!doneContainer) return;
+    var ids = Array.from(doneContainer.children)
+      .map(function(c) { return c.getAttribute('data-id'); })
+      .filter(function(id) { return id !== null; })
+      .map(Number);
+
+    Promise.all(ids.map(function(cardId) {
+      return fetch('/card/' + cardId + '/delete', { method: 'POST' });
+    })).then(function() {
+      doneContainer.innerHTML = '';
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // SortableJS — card drag-and-drop
+  // ---------------------------------------------------------------------------
+  function initSortable() {
+    document.querySelectorAll('[id^="cards-"]').forEach(function(container) {
+      if (container._sortable) {
+        container._sortable.destroy();
+      }
+      var catSlug = container.getAttribute('data-category');
+      container._sortable = new Sortable(container, {
+        group: catSlug,
         animation: 150,
+        handle: null,
+        filter: '.no-drag',
         onEnd: function(evt) {
-          // Get destination container ordering.
-          let destContainer = evt.to;
-          let destCardIds = Array.from(destContainer.children)
-              .map(child => child.getAttribute('data-id'))
-              .filter(id => id !== null);
-          let destStatus = destContainer.id.split('-')[1];
-          // Update destination lane.
-          fetch("/card/order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: destStatus, order: destCardIds.map(Number) })
+          var destContainer = evt.to;
+          var destCategory = destContainer.getAttribute('data-category');
+          var destStatus = destContainer.getAttribute('data-status');
+          var destIds = Array.from(destContainer.children)
+            .map(function(c) { return c.getAttribute('data-id'); })
+            .filter(function(id) { return id !== null; });
+
+          fetch('/card/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: destCategory, status: destStatus, order: destIds.map(Number) })
           });
-          // If card moved from another lane, update the origin lane as well.
+
           if (evt.from !== evt.to) {
-            let originContainer = evt.from;
-            let originCardIds = Array.from(originContainer.children)
-                .map(child => child.getAttribute('data-id'))
-                .filter(id => id !== null);
-            let originStatus = originContainer.id.split('-')[1];
-            fetch("/card/order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: originStatus, order: originCardIds.map(Number) })
+            var originContainer = evt.from;
+            var originCategory = originContainer.getAttribute('data-category');
+            var originStatus = originContainer.getAttribute('data-status');
+            var originIds = Array.from(originContainer.children)
+              .map(function(c) { return c.getAttribute('data-id'); })
+              .filter(function(id) { return id !== null; });
+
+            fetch('/card/order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category: originCategory, status: originStatus, order: originIds.map(Number) })
             });
           }
         }
       });
-    }
-  });
+    });
+  }
 
-  // Function to initialize dynamic subtasks on a container.
+  // ---------------------------------------------------------------------------
+  // SortableJS — settings row/column reorder
+  // ---------------------------------------------------------------------------
+  function initSettingsSortable() {
+    var rowsList = document.getElementById('settings-rows-list');
+    if (rowsList && !rowsList._sortable) {
+      rowsList._sortable = new Sortable(rowsList, {
+        handle: '.settings-drag-handle',
+        animation: 150,
+        onEnd: function() {
+          var order = Array.from(rowsList.children).map(function(li) { return li.getAttribute('data-slug'); });
+          fetch('/category/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: order })
+          }).then(function() { reloadBoard(); });
+        }
+      });
+    }
+
+    var colsList = document.getElementById('settings-cols-list');
+    if (colsList && !colsList._sortable) {
+      colsList._sortable = new Sortable(colsList, {
+        handle: '.settings-drag-handle',
+        animation: 150,
+        onEnd: function() {
+          // Snap 'done' back to last position in DOM and in the order sent to server.
+          var doneEl = colsList.querySelector('[data-slug="done"]');
+          if (doneEl && colsList.lastElementChild !== doneEl) {
+            colsList.appendChild(doneEl);
+          }
+          var order = Array.from(colsList.children).map(function(li) { return li.getAttribute('data-slug'); });
+          fetch('/status/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: order })
+          }).then(function() { reloadBoard(); });
+        }
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Settings: add category/status
+  // ---------------------------------------------------------------------------
+  function submitAddCategory(e) {
+    e.preventDefault();
+    var input = document.getElementById('newCategoryName');
+    var name = input.value.trim();
+    if (!name) return;
+    var fd = new FormData();
+    fd.append('name', name);
+    fetch('/category', { method: 'POST', body: fd })
+      .then(function() {
+        input.value = '';
+        location.reload();
+      });
+  }
+
+  function submitAddStatus(e) {
+    e.preventDefault();
+    var input = document.getElementById('newStatusName');
+    var name = input.value.trim();
+    if (!name) return;
+    var fd = new FormData();
+    fd.append('name', name);
+    fetch('/status', { method: 'POST', body: fd })
+      .then(function() {
+        input.value = '';
+        location.reload();
+      });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Settings: rename category/status
+  // ---------------------------------------------------------------------------
+  function promptRenameCategory(slug, currentName) {
+    var name = prompt('Rename row:', currentName);
+    if (!name || !name.trim()) return;
+    var fd = new FormData();
+    fd.append('name', name.trim());
+    fetch('/category/' + slug + '/rename', { method: 'POST', body: fd })
+      .then(function() { location.reload(); });
+  }
+
+  function promptRenameStatus(slug, currentName) {
+    var name = prompt('Rename column:', currentName);
+    if (!name || !name.trim()) return;
+    var fd = new FormData();
+    fd.append('name', name.trim());
+    fetch('/status/' + slug + '/rename', { method: 'POST', body: fd })
+      .then(function() { location.reload(); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Settings: delete category/status (with card-move prompt)
+  // ---------------------------------------------------------------------------
+  function promptDeleteCategory(slug, name) {
+    var fd = new FormData();
+    fetch('/category/' + slug + '/delete', { method: 'POST', body: fd })
+      .then(function(r) {
+        if (r.ok) { location.reload(); return; }
+        if (r.status === 409) {
+          r.json().then(function(data) {
+            showDeleteWithCardsModal(
+              'Row "' + name + '" has ' + data.count + ' card(s). Move them to another row before deleting.',
+              'category',
+              slug,
+              name
+            );
+          });
+        }
+      });
+  }
+
+  function promptDeleteStatus(slug, name) {
+    var fd = new FormData();
+    fetch('/status/' + slug + '/delete', { method: 'POST', body: fd })
+      .then(function(r) {
+        if (r.ok) { location.reload(); return; }
+        if (r.status === 409) {
+          r.json().then(function(data) {
+            showDeleteWithCardsModal(
+              'Column "' + name + '" has ' + data.count + ' card(s). Move them to another column before deleting.',
+              'status',
+              slug,
+              name
+            );
+          });
+        }
+      });
+  }
+
+  function showDeleteWithCardsModal(msg, type, slug, name) {
+    document.getElementById('deleteWithCardsMsg').textContent = msg;
+    var select = document.getElementById('deleteWithCardsMoveTo');
+    select.innerHTML = '';
+
+    // Populate options from the settings list
+    var listId = type === 'category' ? 'settings-rows-list' : 'settings-cols-list';
+    var list = document.getElementById(listId);
+    list.querySelectorAll('li[data-slug]').forEach(function(li) {
+      var liSlug = li.getAttribute('data-slug');
+      if (liSlug === slug) return;
+      var opt = document.createElement('option');
+      opt.value = liSlug;
+      opt.textContent = li.querySelector('span').textContent;
+      select.appendChild(opt);
+    });
+
+    var confirmBtn = document.getElementById('deleteWithCardsConfirm');
+    confirmBtn.onclick = function() {
+      var moveTo = select.value;
+      var fd = new FormData();
+      fd.append('move_to', moveTo);
+      var url = type === 'category'
+        ? '/category/' + slug + '/delete'
+        : '/status/' + slug + '/delete';
+      fetch(url, { method: 'POST', body: fd })
+        .then(function() {
+          hideModal('deleteWithCardsModal');
+          location.reload();
+        });
+    };
+
+    hideModal('settingsModal');
+    showModal('deleteWithCardsModal');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Subtasks
+  // ---------------------------------------------------------------------------
   function initSubtasks(container) {
     container.addEventListener('click', function(e) {
-      let btn = e.target.closest('.remove-subtask-btn');
+      var btn = e.target.closest('.remove-subtask-btn');
       if (btn && container.contains(btn)) {
         btn.closest('.subtask-row').remove();
       }
     });
-    const form = container.closest('form');
+    var form = container.closest('form');
     if (form) {
       form.querySelectorAll('.add-subtask-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
-          const row = document.createElement('div');
+          var row = document.createElement('div');
           row.className = 'subtask-row flex items-center space-x-2 mb-2';
-          row.innerHTML = `
-            <input type="checkbox" class="subtask-complete w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-            <input type="text" class="subtask-text flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="Subtask description">
-            <button type="button" class="remove-subtask-btn text-red-500 hover:text-red-700 p-1" title="Remove">
-              <i class="bi bi-x text-lg"></i>
-            </button>
-          `;
+          row.innerHTML = '<input type="checkbox" class="subtask-complete w-4 h-4 text-blue-600 rounded focus:ring-blue-500"><input type="text" class="subtask-text flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" placeholder="Subtask description"><button type="button" class="remove-subtask-btn text-red-500 hover:text-red-700 p-1" title="Remove"><i class="bi bi-x text-lg"></i></button>';
           container.appendChild(row);
         });
       });
     }
   }
 
-  // Function to collect subtasks data before form submission.
   function prepareSubtasks(form) {
-    const container = form.querySelector('.subtasks-container');
-    const hidden = form.querySelector('.subtasks-hidden');
-    let subtasks = [];
+    var container = form.querySelector('.subtasks-container');
+    var hidden = form.querySelector('.subtasks-hidden');
+    var subtasks = [];
     container.querySelectorAll('.subtask-row').forEach(function(row) {
-      const complete = row.querySelector('.subtask-complete').checked ? "1" : "0";
-      const text = row.querySelector('.subtask-text').value.trim();
-      if (text !== "") {
-        subtasks.push(complete + "|" + text);
+      var complete = row.querySelector('.subtask-complete').checked ? '1' : '0';
+      var text = row.querySelector('.subtask-text').value.trim();
+      if (text !== '') {
+        subtasks.push(complete + '|' + text);
       }
     });
-    hidden.value = subtasks.join("\n");
+    hidden.value = subtasks.join('\n');
     return true;
   }
 
-  // HTMX afterSwap handler.
-  document.body.addEventListener("htmx:afterSwap", function(evt) {
-    // If new card added (target is cards-todo), hide the Add Card modal and reset its form.
-    if (evt.detail.target.id === "cards-todo") {
+  // ---------------------------------------------------------------------------
+  // Card minimize on load
+  // ---------------------------------------------------------------------------
+  function initCardMinimize() {
+    document.querySelectorAll('[aria-label="Toggle card"]').forEach(function(btn) {
+      var card = btn.closest('[data-id]');
+      if (!card) return;
+      var body = card.querySelector('.card-body');
+      var icon = btn.querySelector('i');
+      if (!body || !icon) return;
+      body.classList.add('hidden');
+      icon.classList.remove('bi-dash-square');
+      icon.classList.add('bi-plus-square');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // HTMX events
+  // ---------------------------------------------------------------------------
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id && evt.detail.target.id.startsWith('cards-')) {
       hideModal('addCardModal');
       var form = document.getElementById('addCardForm');
       if (form) {
         form.reset();
-        const container = form.querySelector('.subtasks-container');
-        if (container) { container.innerHTML = ""; }
+        updateAddCardTarget();
+        var container = form.querySelector('.subtasks-container');
+        if (container) container.innerHTML = '';
       }
     }
-    // If the edit form is loaded into the modal, show the modal and initialize subtasks.
-    if (evt.detail.target.id === "editCardModalContent") {
+
+    if (evt.detail.target.id === 'editCardModalContent') {
       showModal('editCardModal');
       var container = document.getElementById('editCardModalContent').querySelector('.subtasks-container');
-      if (container) { initSubtasks(container); }
+      if (container) initSubtasks(container);
     }
-    // After a card update (target id starts with "card-"), hide the edit modal.
-    if (evt.detail.target && evt.detail.target.id && evt.detail.target.id.startsWith("card-")) {
+
+    if (evt.detail.target && evt.detail.target.id && evt.detail.target.id.startsWith('card-')) {
       hideModal('editCardModal');
     }
   });
 
-  // Initialize everything on page load.
-  document.addEventListener("DOMContentLoaded", function() {
+  // ---------------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------------
+  document.addEventListener('DOMContentLoaded', function() {
     initDarkMode();
+    updateAddCardTarget();
+    initSortable();
+    initSettingsSortable();
+    initCardMinimize();
+
     var addForm = document.getElementById('addCardForm');
     if (addForm) {
       var container = addForm.querySelector('.subtasks-container');
-      if (container) { initSubtasks(container); }
+      if (container) initSubtasks(container);
     }
   });
 </script>
 </body>
 </html>
+{{end}}
