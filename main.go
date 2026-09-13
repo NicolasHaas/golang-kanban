@@ -19,6 +19,15 @@ const (
 	StatusDone       = "done"
 )
 
+// validStatus reports whether s is one of the three lanes index.html draws.
+// A card in any other status is still in the database and no longer on the
+// board: indexHandler groups by status into a map that only has these three
+// keys, so a fourth one is created, never rendered, and cannot be reached
+// again from the interface.
+func validStatus(s string) bool {
+	return s == StatusTodo || s == StatusInProgress || s == StatusDone
+}
+
 type Card struct {
 	ID          int
 	Title       string
@@ -144,7 +153,7 @@ func createCardHandler(w http.ResponseWriter, r *http.Request) {
 	subtasks := r.FormValue("subtasks")
 	status := r.FormValue("status")
 
-	if status != StatusTodo && status != StatusInProgress && status != StatusDone {
+	if !validStatus(status) {
 		status = StatusTodo // Default to todo
 	}
 
@@ -212,7 +221,7 @@ func moveCardHandler(w http.ResponseWriter, r *http.Request, id int) {
 	}
 	newStatus := r.FormValue("status")
 
-	if newStatus != StatusTodo && newStatus != StatusInProgress && newStatus != StatusDone {
+	if !validStatus(newStatus) {
 		http.Error(w, "Invalid status", http.StatusBadRequest)
 		return
 	}
@@ -324,6 +333,14 @@ func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	// The same check createCardHandler and moveCardHandler make. Without it
+	// this handler wrote whatever status the request carried, and a card in a
+	// status index.html has no lane for is gone from the board with no way
+	// back through the interface.
+	if !validStatus(payload.Status) {
+		http.Error(w, "Invalid status", http.StatusBadRequest)
 		return
 	}
 	for index, cardId := range payload.Order {

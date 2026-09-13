@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -164,5 +165,40 @@ func TestUpdateOrderHandlerWrongMethod(t *testing.T) {
 
 	if rr.Code != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status %d, got %d", http.StatusMethodNotAllowed, rr.Code)
+	}
+}
+
+// A status that is not one of the three lanes has to be refused here, the way
+// createCardHandler and moveCardHandler refuse it. index.html draws a lane for
+// each of the three and nothing else, so a card written into a fourth status
+// stays in the database and disappears from the board, and no request the
+// interface can make brings it back.
+//
+// The handler is called with db still nil: the check has to happen before the
+// UPDATE, so reaching the database at all would panic here rather than pass.
+func TestUpdateOrderHandlerRejectsUnknownStatus(t *testing.T) {
+	for _, status := range []string{"archived", "", "TODO", "todo "} {
+		body := strings.NewReader(`{"status":"` + status + `","order":[1]}`)
+		req := httptest.NewRequest(http.MethodPost, "/card/order", body)
+		rr := httptest.NewRecorder()
+
+		updateOrderHandler(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("status %q: expected %d, got %d", status, http.StatusBadRequest, rr.Code)
+		}
+	}
+}
+
+func TestValidStatus(t *testing.T) {
+	for _, s := range []string{StatusTodo, StatusInProgress, StatusDone} {
+		if !validStatus(s) {
+			t.Errorf("Expected %q to be a valid status", s)
+		}
+	}
+	for _, s := range []string{"", "archived", "Todo", "done "} {
+		if validStatus(s) {
+			t.Errorf("Expected %q to be rejected", s)
+		}
 	}
 }
