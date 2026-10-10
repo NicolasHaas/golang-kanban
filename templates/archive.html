@@ -1,0 +1,41 @@
+{{define "archive.html"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Archive · {{.Board.Name}}</title>
+  {{template "head"}}
+</head>
+<body>
+<div class="container narrow">
+  <header class="header">
+    <a href="/b/{{.Board.Slug}}" class="icon-btn toggle" title="Back to the board" aria-label="Back to the board"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="board-title">Archive of {{.Board.Name}}</h1>
+    {{template "user" .User}}
+    {{template "theme_toggle"}}
+  </header>
+
+  {{$next := printf "/b/%s/archive" .Board.Slug}}
+  <ul class="board-list">
+    {{range .Cards}}
+      <li class="board-item archived">
+        <div class="board-item-main column">
+          <span class="board-link">{{.Title}}</span>
+          <span class="board-meta">from {{.Lane}} · archived {{date .ArchivedAt}}</span>
+        </div>
+        <form method="post" action="/card/{{.ID}}/restore">
+          <input type="hidden" name="next" value="{{$next}}">
+          <button type="submit" class="btn btn-secondary"><i class="bi bi-arrow-counterclockwise"></i> Restore</button>
+        </form>
+        <form method="post" action="/card/{{.ID}}/delete" data-confirm="Delete “{{.Title}}” for good? This cannot be undone.">
+          <input type="hidden" name="next" value="{{$next}}">
+          <button type="submit" class="icon-btn danger" title="Delete for good" aria-label="Delete for good"><i class="bi bi-trash"></i></button>
+        </form>
+      </li>
+    {{else}}
+      <li class="board-item empty">Nothing archived. Archived cards wait here until they are restored or deleted.</li>
+    {{end}}
+  </ul>
+</div>
+<script src="{{asset "app.js"}}"></script>
+</body>
+</html>
+{{end}}

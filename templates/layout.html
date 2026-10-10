@@ -1,0 +1,23 @@
+{{/* The parts every page shares. */}}
+
+{{define "head"}}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false}'>
+  <link rel="stylesheet" href="{{asset "vendor/bootstrap-icons/bootstrap-icons.min.css"}}">
+  <link rel="stylesheet" href="{{asset "app.css"}}">
+  <!-- Sets the theme before the first paint, so a dark board does not flash white. -->
+  <script src="{{asset "theme.js"}}"></script>
+{{end}}
+
+{{define "theme_toggle"}}
+<button type="button" id="darkModeToggle" class="icon-btn toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+  <i class="bi bi-sun light-only"></i>
+  <i class="bi bi-moon dark-only"></i>
+</button>
+{{end}}
+
+{{/* Who is signed in, when a sign-in proxy is in front. */}}
+{{define "user"}}
+{{if .}}<span class="signed-in" title="Signed in as {{.}}"><span class="avatar">{{initials .}}</span></span>{{end}}
+{{end}}

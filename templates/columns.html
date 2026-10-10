@@ -1,0 +1,50 @@
+{{define "columns.html"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Columns · {{.Board.Name}}</title>
+  {{template "head"}}
+</head>
+<body>
+<div class="container narrow">
+  <header class="header">
+    <a href="/b/{{.Board.Slug}}" class="icon-btn toggle" title="Back to the board" aria-label="Back to the board"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="board-title">Columns of {{.Board.Name}}</h1>
+    {{template "user" .User}}
+    {{template "theme_toggle"}}
+  </header>
+
+  {{$slug := .Board.Slug}}
+  {{$last := len .Lanes}}
+  <ul class="board-list">
+    {{range $i, $l := .Lanes}}
+      <li class="board-item">
+        <form method="post" action="/b/{{$slug}}/columns/{{$l.ID}}/rename" class="inline-form grow">
+          <input type="text" name="name" value="{{$l.Name}}" required maxlength="50" aria-label="Column name">
+          <button type="submit" class="btn btn-secondary" title="Rename" aria-label="Rename"><i class="bi bi-check-lg"></i></button>
+        </form>
+        <span class="board-meta">{{$l.Count}} card{{if ne $l.Count 1}}s{{end}}{{with archivedIn $l}} + {{.}} archived{{end}}</span>
+        <form method="post" action="/b/{{$slug}}/columns/{{$l.ID}}/move">
+          <button type="submit" name="dir" value="left" class="icon-btn edit" title="Move left" aria-label="Move left"{{if eq $i 0}} disabled{{end}}><i class="bi bi-arrow-left"></i></button>
+          <button type="submit" name="dir" value="right" class="icon-btn edit" title="Move right" aria-label="Move right"{{if eq (len (slice $.Lanes $i)) 1}} disabled{{end}}><i class="bi bi-arrow-right"></i></button>
+        </form>
+        <form method="post" action="/b/{{$slug}}/columns/{{$l.ID}}/delete">
+          <button type="submit" class="icon-btn danger"
+            {{if $l.Total}}disabled title="Move or archive its cards first, and empty its archive"{{else if eq $last 1}}disabled title="A board needs at least one column"{{else}}title="Delete"{{end}} aria-label="Delete column">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </li>
+    {{end}}
+  </ul>
+
+  {{if lt (len .Lanes) .Max}}
+  <form method="post" action="/b/{{$slug}}/columns" class="inline-form new-board">
+    <input type="text" name="name" required maxlength="50" placeholder="New column name" aria-label="New column name">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-plus"></i> Add Column</button>
+  </form>
+  {{end}}
+</div>
+<script src="{{asset "app.js"}}"></script>
+</body>
+</html>
+{{end}}

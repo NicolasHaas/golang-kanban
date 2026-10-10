@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{.Board.Name}}</title>
+  {{template "head"}}
+</head>
+<body>
+<div class="container wide">
+  <header class="header">
+    <a href="/" class="icon-btn toggle" title="All boards" aria-label="All boards"><i class="bi bi-grid"></i></a>
+    <h1 class="board-title">{{.Board.Name}}</h1>
+    {{template "user" .User}}
+    <a href="/search?board={{.Board.Slug}}" class="icon-btn toggle" title="Search" aria-label="Search"><i class="bi bi-search"></i></a>
+    <a href="/b/{{.Board.Slug}}/archive" class="icon-btn toggle" title="Archive" aria-label="Archive"><i class="bi bi-archive"></i></a>
+    <a href="/b/{{.Board.Slug}}/columns" class="icon-btn toggle" title="Columns" aria-label="Columns"><i class="bi bi-layout-three-columns"></i></a>
+    {{template "theme_toggle"}}
+  </header>
+
+  {{with .Lanes}}
+  <div class="add-row">
+    <button type="button" class="btn btn-primary btn-large" data-open-modal="addCardModal" data-lane="{{(index . 0).ID}}">
+      <i class="bi bi-plus"></i> Add New Card
+    </button>
+  </div>
+  {{end}}
+
+  {{/* On a phone the columns are tabs, one shown at a time. */}}
+  <nav class="lane-tabs" role="tablist">
+    {{range $i, $l := .Lanes}}
+    <button type="button" class="lane-tab{{if eq $i 0}} active{{end}}" role="tab" data-tab="{{$l.ID}}"
+      aria-selected="{{if eq $i 0}}true{{else}}false{{end}}">
+      {{$l.Name}} <span class="lane-count" data-count-for="{{$l.ID}}">{{len $l.Cards}}</span>
+    </button>
+    {{end}}
+  </nav>
+
+  <main class="board" data-order-url="/b/{{.Board.Slug}}/order">
+    {{range $i, $l := .Lanes}}
+    <section class="lane{{if eq $i 0}} active{{end}}" data-tab="{{$l.ID}}">
+      <div class="lane-header">
+        <h3 class="lane-title">{{$l.Name}} <span class="lane-count" data-count-for="{{$l.ID}}">{{len $l.Cards}}</span></h3>
+        <button type="button" class="icon-btn edit" data-open-modal="addCardModal" data-lane="{{.ID}}" title="Add a card to {{.Name}}" aria-label="Add a card to {{.Name}}">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
+      <div id="lane-{{.ID}}" class="lane-cards" data-lane="{{.ID}}">
+        {{range .Cards}}{{template "card_fragment.html" .}}{{end}}
+      </div>
+    </section>
+    {{end}}
+  </main>
+</div>
+
+<dialog class="modal" id="addCardModal" aria-labelledby="addCardTitle">
+  <div class="modal-dialog">
+    <form id="addCardForm" class="modal-content" hx-post="/b/{{.Board.Slug}}/card" hx-swap="none" hx-disabled-elt="find button[type=submit]">
+      <div class="modal-header">
+        <h5 id="addCardTitle">Add New Card</h5>
+        <button type="button" class="icon-btn" data-close-modal title="Close" aria-label="Close"><i class="bi bi-x"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" name="lane" value="">
+        {{template "card_fields" .New}}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Card</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<dialog class="modal" id="editCardModal" aria-label="Edit Card">
+  <div class="modal-dialog">
+    <div class="modal-content" id="editCardModalContent" tabindex="-1">
+      <!-- The edit form is loaded here by htmx. -->
+    </div>
+  </div>
+</dialog>
+
+<template id="subtask-row-template">{{template "subtask_row" .Blank}}</template>
+
+<script src="{{asset "vendor/htmx/htmx.min.js"}}"></script>
+<script src="{{asset "vendor/sortablejs/Sortable.min.js"}}"></script>
+<script src="{{asset "app.js"}}"></script>
+</body>
+</html>

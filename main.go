@@ -1,96 +1,61 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"encoding/json"
-	"html/template"
-	"log"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
-	"strconv"
-	"strings"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
 
 	_ "github.com/lib/pq"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
-const (
-	StatusTodo       = "todo"
-	StatusInProgress = "inprogress"
-	StatusDone       = "done"
-)
-
-// validStatus reports whether s is one of the three lanes index.html draws.
-// A card in any other status is still in the database and no longer on the
-// board: indexHandler groups by status into a map that only has these three
-// keys, so a fourth one is created, never rendered, and cannot be reached
-// again from the interface.
-func validStatus(s string) bool {
-	return s == StatusTodo || s == StatusInProgress || s == StatusDone
-}
-
-type Card struct {
-	ID          int
-	Title       string
-	Description string
-	Subtasks    string
-	Status      string // "todo", "inprogress", "done"
-	CardOrder   int
-}
-
-var db *sql.DB
-var tmpl *template.Template
-
-type OrderUpdatePayload struct {
-	Status string `json:"status"`
-	Order  []int  `json:"order"`
-}
+const usage = `usage:
+  kanban [serve]                          run the web server (the default)
+  kanban export [-o file] [-board slug]   write boards as JSON, to stdout unless -o is given
+  kanban import [-replace] [-dry-run] file|-
+                                          read boards from an export; - reads stdin
+`
 
 func main() {
-	dbUser := getEnv("DB_USER", "user")
-	dbPass := getEnv("DB_PASS", "password")
-	dbHost := getEnv("DB_HOST", "postgres")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbName := getEnv("DB_NAME", "kanban")
-	connStr := "postgres://" + dbUser + ":" + dbPass + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=disable"
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cmd, args := "serve", os.Args[1:]
+	if len(args) > 0 {
+		cmd, args = args[0], args[1:]
+	}
 	var err error
-	db, err = sql.Open("postgres", connStr)
+	switch cmd {
+	case "serve":
+		err = serve(ctx)
+	case "export":
+		err = exportCmd(ctx, args)
+	case "import":
+		err = importCmd(ctx, args)
+	case "help", "-h", "-help", "--help":
+		fmt.Print(usage)
+		return
+	default:
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(2)
+	}
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(cmd+" failed", "err", err)
+		os.Exit(1)
 	}
-
-	db.SetMaxOpenConns(5)
-	db.SetMaxIdleConns(1)
-
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
-		}
-	}()
-
-	funcMap := template.FuncMap{
-		"split": func(s, sep string) []string {
-			s = strings.TrimSpace(s)
-			if s == "" {
-				return nil
-			}
-			return strings.Split(s, sep)
-		},
-		"trim": strings.TrimSpace,
-	}
-	tmpl = template.Must(template.New("").Funcs(funcMap).ParseGlob("templates/*.html"))
-
-	// Favicon handler to avoid 404.
-	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	http.HandleFunc("/", indexHandler)
-	http.HandleFunc("/card", createCardHandler)
-	http.HandleFunc("/card/", cardRouter)
-	http.HandleFunc("/card/order", updateOrderHandler)
-
-	serverPort := getEnv("SERVER_PORT", "17808")
-	log.Println("Server started on :" + serverPort)
-	log.Fatal(http.ListenAndServe(":"+serverPort, nil))
 }
 
 func getEnv(key, def string) string {
@@ -101,256 +66,209 @@ func getEnv(key, def string) string {
 	return v
 }
 
-func getCardByID(id int) (*Card, error) {
-	var card Card
-	err := db.QueryRow("SELECT id, title, description, subtasks, status, card_order FROM cards WHERE id=$1", id).
-		Scan(&card.ID, &card.Title, &card.Description, &card.Subtasks, &card.Status, &card.CardOrder)
-	if err != nil {
+// dsnFromEnv builds the connection URL with net/url, so a password containing
+// '@', '/' or '?' is escaped instead of silently producing a different URL.
+func dsnFromEnv() string {
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(getEnv("DB_USER", "user"), getEnv("DB_PASS", "password")),
+		Host:     net.JoinHostPort(getEnv("DB_HOST", "postgres"), getEnv("DB_PORT", "5432")),
+		Path:     "/" + getEnv("DB_NAME", "kanban"),
+		RawQuery: url.Values{"sslmode": {getEnv("DB_SSLMODE", "disable")}}.Encode(),
+	}
+	return u.String()
+}
+
+// sqliteDSN switches on foreign keys and WAL, makes a writer wait for a lock
+// instead of failing at once, and takes the write lock when a transaction
+// begins, so a `kanban import` next to the running server queues rather than
+// failing halfway.
+//
+// The path goes in as a URL path, so a '#', '?' or '%' in it is escaped
+// rather than ending the file name early and opening a different file.
+func sqliteDSN(path string) string {
+	u := url.URL{Scheme: "file", OmitHost: true, Path: path, RawQuery: "_txlock=immediate" +
+		"&_pragma=foreign_keys(1)&_pragma=journal_mode(wal)&_pragma=busy_timeout(5000)"}
+	return u.String()
+}
+
+// openStore connects to the database STORAGE names, waits for it if it is
+// still starting, and brings the schema up to date.
+func openStore(ctx context.Context) (*store, error) {
+	s := &store{dialect: getEnv("STORAGE", "postgres")}
+	var err error
+	switch s.dialect {
+	case "postgres":
+		s.db, err = sql.Open("postgres", dsnFromEnv())
+		if err != nil {
+			return nil, err
+		}
+		s.db.SetMaxOpenConns(5)
+		s.db.SetMaxIdleConns(2)
+		s.db.SetConnMaxIdleTime(5 * time.Minute)
+	case "sqlite":
+		s.db, err = sql.Open("sqlite3", sqliteDSN(getEnv("SQLITE_PATH", "kanban.db")))
+		if err != nil {
+			return nil, err
+		}
+		// One connection: SQLite takes one writer at a time anyway, and this
+		// way writes queue in Go instead of failing with "database is locked".
+		s.db.SetMaxOpenConns(1)
+	default:
+		return nil, fmt.Errorf("STORAGE=%q: use postgres or sqlite", s.dialect)
+	}
+
+	// With docker compose the database is often still starting when we are.
+	if err := waitForDB(ctx, s.db, 30*time.Second); err != nil {
+		_ = s.db.Close()
 		return nil, err
 	}
-	return &card, nil
+	if err := s.migrate(ctx); err != nil {
+		_ = s.db.Close()
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+	return s, nil
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	cardsByStatus := map[string][]Card{
-		StatusTodo:       {},
-		StatusInProgress: {},
-		StatusDone:       {},
-	}
-	rows, err := db.Query("SELECT id, title, description, subtasks, status, card_order FROM cards ORDER BY status, card_order")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			log.Printf("Error closing rows: %v", err)
+func waitForDB(ctx context.Context, db *sql.DB, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		err := db.PingContext(ctx)
+		if err == nil {
+			return nil
 		}
+		slog.Warn("waiting for database", "err", err)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("database not reachable: %w", err)
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func serve(ctx context.Context) error {
+	s, err := openStore(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.db.Close() }()
+
+	// AUTH_HEADER names the header a sign-in proxy such as oauth2-proxy puts
+	// the user's email in. Setting it turns on assignees and refuses every
+	// request that did not come through the proxy.
+	authHeader := os.Getenv("AUTH_HEADER")
+	a, err := newApp(s, authHeader)
+	if err != nil {
+		return err
+	}
+	if authHeader != "" {
+		slog.Info("sign-in required", "header", authHeader)
+	}
+	srv := &http.Server{
+		Addr:              ":" + getEnv("SERVER_PORT", "17808"),
+		Handler:           a.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+
+	errc := make(chan error, 1)
+	go func() {
+		slog.Info("server started", "addr", srv.Addr, "storage", s.dialect)
+		errc <- srv.ListenAndServe()
 	}()
-	for rows.Next() {
-		var c Card
-		if err := rows.Scan(&c.ID, &c.Title, &c.Description, &c.Subtasks, &c.Status, &c.CardOrder); err != nil {
-			continue
-		}
-		cardsByStatus[c.Status] = append(cardsByStatus[c.Status], c)
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
 	}
-	if err := tmpl.ExecuteTemplate(w, "index.html", cardsByStatus); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+
+	slog.Info("shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return srv.Shutdown(shutdownCtx)
 }
 
-func createCardHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/card" || r.Method != http.MethodPost {
-		http.NotFound(w, r)
-		return
-	}
-	title := r.FormValue("title")
-	description := r.FormValue("description")
-	subtasks := r.FormValue("subtasks")
-	status := r.FormValue("status")
-
-	if !validStatus(status) {
-		status = StatusTodo // Default to todo
+func exportCmd(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	out := fs.String("o", "", "write to this file instead of stdout")
+	board := fs.String("board", "", "export only the board with this slug")
+	_ = fs.Parse(args)
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected argument %q", fs.Arg(0))
 	}
 
-	if strings.TrimSpace(title) == "" && strings.TrimSpace(description) == "" && strings.TrimSpace(subtasks) == "" {
-		http.Error(w, "Empty card not allowed", http.StatusBadRequest)
-		return
-	}
-	var maxOrder int
-	err := db.QueryRow("SELECT COALESCE(MAX(card_order), 0) FROM cards WHERE status=$1", status).Scan(&maxOrder)
+	s, err := openStore(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	maxOrder++
-	var newID int
-	err = db.QueryRow("INSERT INTO cards (title, description, subtasks, status, card_order) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		title, description, subtasks, status, maxOrder).Scan(&newID)
+	defer func() { _ = s.db.Close() }()
+
+	if *out == "" {
+		return s.export(ctx, os.Stdout, *board)
+	}
+	// Written next to the target and renamed, so a failed export never
+	// leaves a truncated file where the last good one was. CreateTemp makes
+	// it 0600, which is right for a file that holds the whole board.
+	f, err := os.CreateTemp(filepath.Dir(*out), ".kanban-export-*")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
-	card := Card{ID: newID, Title: title, Description: description, Subtasks: subtasks, Status: status, CardOrder: maxOrder}
-	if r.Header.Get("HX-Request") != "" {
-		if err := tmpl.ExecuteTemplate(w, "card_fragment.html", card); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		return
+	defer func() { _ = os.Remove(f.Name()) }()
+	if err := s.export(ctx, f, *board); err != nil {
+		_ = f.Close()
+		return err
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), *out)
 }
 
-// cardRouter dispatches requests based on URL segments: /card/{id}/{action}
-func cardRouter(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) < 4 {
-		http.NotFound(w, r)
-		return
-	}
-	id, err := strconv.Atoi(parts[2])
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	action := parts[3]
-	switch action {
-	case "move":
-		moveCardHandler(w, r, id)
-	case "edit":
-		editCardHandler(w, r, id)
-	case "update":
-		updateCardHandler(w, r, id)
-	case "delete":
-		deleteCardHandler(w, r, id)
-	case "view":
-		viewCardHandler(w, r, id)
-	default:
-		http.NotFound(w, r)
-	}
-}
-
-func moveCardHandler(w http.ResponseWriter, r *http.Request, id int) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	newStatus := r.FormValue("status")
-
-	if !validStatus(newStatus) {
-		http.Error(w, "Invalid status", http.StatusBadRequest)
-		return
+func importCmd(ctx context.Context, args []string) error {
+	fs := flag.NewFlagSet("import", flag.ExitOnError)
+	replace := fs.Bool("replace", false, "delete boards that are in the file and already exist, then import them")
+	dryRun := fs.Bool("dry-run", false, "check the file and say what it holds, write nothing")
+	_ = fs.Parse(args)
+	if fs.NArg() != 1 {
+		return errors.New("import needs exactly one file, or - for stdin")
 	}
 
-	newOrder, err := strconv.Atoi(r.FormValue("order"))
-	if err != nil {
-		http.Error(w, "Invalid order", http.StatusBadRequest)
-		return
-	}
-	_, err = db.Exec("UPDATE cards SET status=$1, card_order=$2 WHERE id=$3", newStatus, newOrder, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	// Recalculate order for the destination lane.
-	_, err = db.Exec(`
-        WITH OrderedCards AS (
-            SELECT id, ROW_NUMBER() OVER (ORDER BY card_order, id) AS new_order
-            FROM cards
-            WHERE status = $1
-        )
-        UPDATE cards SET card_order = OrderedCards.new_order
-        FROM OrderedCards
-        WHERE cards.id = OrderedCards.id;
-    `, newStatus)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write([]byte("OK")); err != nil {
-		log.Printf("Error writing response: %v", err)
-	}
-}
-
-func editCardHandler(w http.ResponseWriter, r *http.Request, id int) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	card, err := getCardByID(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	if err := tmpl.ExecuteTemplate(w, "card_edit_fragment.html", card); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func updateCardHandler(w http.ResponseWriter, r *http.Request, id int) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	title := r.FormValue("title")
-	description := r.FormValue("description")
-	subtasks := r.FormValue("subtasks")
-	_, err := db.Exec("UPDATE cards SET title=$1, description=$2, subtasks=$3 WHERE id=$4", title, description, subtasks, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	updated, err := getCardByID(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	if err := tmpl.ExecuteTemplate(w, "card_fragment.html", updated); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func deleteCardHandler(w http.ResponseWriter, r *http.Request, id int) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	_, err := db.Exec("DELETE FROM cards WHERE id=$1", id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := w.Write([]byte("OK")); err != nil {
-		log.Printf("Error writing response: %v", err)
-	}
-}
-
-func viewCardHandler(w http.ResponseWriter, r *http.Request, id int) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	card, err := getCardByID(id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	if err := tmpl.ExecuteTemplate(w, "card_fragment.html", card); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-}
-
-func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var payload OrderUpdatePayload
-	err := json.NewDecoder(r.Body).Decode(&payload)
-	if err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-	// The same check createCardHandler and moveCardHandler make. Without it
-	// this handler wrote whatever status the request carried, and a card in a
-	// status index.html has no lane for is gone from the board with no way
-	// back through the interface.
-	if !validStatus(payload.Status) {
-		http.Error(w, "Invalid status", http.StatusBadRequest)
-		return
-	}
-	for index, cardId := range payload.Order {
-		_, err := db.Exec("UPDATE cards SET status=$1, card_order=$2 WHERE id=$3", payload.Status, index+1, cardId)
+	var r io.Reader = os.Stdin
+	if name := fs.Arg(0); name != "-" {
+		f, err := os.Open(name)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
+		defer func() { _ = f.Close() }()
+		r = f
 	}
-	if _, err := w.Write([]byte("OK")); err != nil {
-		log.Printf("Error writing response: %v", err)
+	snap, err := readSnapshot(r)
+	if err != nil {
+		return err
 	}
+	for _, b := range snap.Boards {
+		cards := 0
+		for _, l := range b.Columns {
+			cards += len(l.Cards)
+		}
+		fmt.Fprintf(os.Stderr, "board %-20s %2d columns %4d cards  %s\n", b.Slug, len(b.Columns), cards, b.Name)
+	}
+	if *dryRun {
+		fmt.Fprintln(os.Stderr, "dry run: nothing written")
+		return nil
+	}
+
+	s, err := openStore(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = s.db.Close() }()
+	if err := s.importSnapshot(ctx, snap, *replace); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "imported %d boards\n", len(snap.Boards))
+	return nil
 }

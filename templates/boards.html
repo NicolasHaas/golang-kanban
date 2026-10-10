@@ -1,0 +1,51 @@
+{{define "boards.html"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Kanban Boards</title>
+  {{template "head"}}
+</head>
+<body>
+<div class="container narrow">
+  <header class="header">
+    <h1 class="board-title">Kanban Boards</h1>
+    {{template "user" .User}}
+    <a href="/search" class="icon-btn toggle" title="Search all boards" aria-label="Search all boards"><i class="bi bi-search"></i></a>
+    {{template "theme_toggle"}}
+  </header>
+
+  <ul class="board-list">
+    {{range .Boards}}
+      <li class="board-item">
+        <div class="board-item-main">
+          <a class="board-link" href="/b/{{.Slug}}">{{.Name}}</a>
+          <span class="board-meta">{{.Cards}} card{{if ne .Cards 1}}s{{end}}</span>
+        </div>
+        <details class="board-action">
+          <summary title="Rename" aria-label="Rename"><i class="bi bi-pencil"></i></summary>
+          <form method="post" action="/b/{{.Slug}}/rename" class="inline-form">
+            <input type="text" name="name" value="{{.Name}}" required maxlength="100" aria-label="New name">
+            <button type="submit" class="btn btn-primary">Rename</button>
+          </form>
+        </details>
+        <details class="board-action">
+          <summary title="Delete" aria-label="Delete" class="danger"><i class="bi bi-trash"></i></summary>
+          <form method="post" action="/b/{{.Slug}}/delete" class="inline-form">
+            <input type="text" name="confirm" required autocomplete="off" placeholder="Type “{{.Name}}” to delete it and its cards" aria-label="Board name">
+            <button type="submit" class="btn btn-danger">Delete</button>
+          </form>
+        </details>
+      </li>
+    {{else}}
+      <li class="board-item empty">No boards yet.</li>
+    {{end}}
+  </ul>
+
+  <form method="post" action="/boards" class="inline-form new-board">
+    <input type="text" name="name" required maxlength="100" placeholder="New board name" aria-label="New board name">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-plus"></i> Add Board</button>
+  </form>
+</div>
+<script src="{{asset "app.js"}}"></script>
+</body>
+</html>
+{{end}}
