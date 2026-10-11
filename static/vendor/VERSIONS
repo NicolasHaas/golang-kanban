@@ -1,0 +1,12 @@
+# Vendored front-end files, served from the binary so nothing loads from a CDN.
+# Update by replacing the file and its lines here.
+# name              version   licence   source
+htmx                2.0.10    0BSD      https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.10/htmx.min.js
+sortablejs          1.15.7    MIT       https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.7/Sortable.min.js
+bootstrap-icons     1.13.1    MIT       https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.13.1/font/
+
+71ea67185bfa8c98c39d31717c6fce5d852370fcdfd129db4543774d3145c0de  htmx/htmx.min.js
+bf4241bc73fef7f11c59a283a69fe8051cdd31c6d8ff5a2b9ba219e7831fcf76  sortablejs/Sortable.min.js
+a5d6387a32ca3baec4d02336b5b3edab50c9dd518355576a011ea3dd9c1d884e  bootstrap-icons/bootstrap-icons.min.css
+f55513b7b591cb84a3b87ff0e34ea24d4831d6fedc22e54b911ca64b5b544a15  bootstrap-icons/fonts/bootstrap-icons.woff
+6c75710364a1ca5604267716f6d28997b26319fdb078cf11e0b42ab66ff2ea61  bootstrap-icons/fonts/bootstrap-icons.woff2

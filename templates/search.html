@@ -1,0 +1,49 @@
+{{define "search.html"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Search{{with .Board.Name}} · {{.}}{{end}}</title>
+  {{template "head"}}
+</head>
+<body>
+<div class="container narrow">
+  <header class="header">
+    <a href="{{if .Board.Slug}}/b/{{.Board.Slug}}{{else}}/{{end}}" class="icon-btn toggle" title="Back" aria-label="Back"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="board-title">{{if .Board.Slug}}Search {{.Board.Name}}{{else}}Search all boards{{end}}</h1>
+    {{template "user" .User}}
+    {{template "theme_toggle"}}
+  </header>
+
+  <form method="get" action="/search" class="inline-form search-form" role="search">
+    {{with .Board.Slug}}<input type="hidden" name="board" value="{{.}}">{{end}}
+    <input type="search" name="q" value="{{.Query}}" placeholder="Words in a title, description or subtask" aria-label="Search" autofocus>
+    <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i> Search</button>
+  </form>
+  {{if .Board.Slug}}
+    <p class="search-scope"><a href="/search?q={{.Query}}">Search all boards instead</a></p>
+  {{end}}
+
+  {{if .Query}}
+  <ul class="board-list">
+    {{range .Hits}}
+      <li class="board-item">
+        <div class="board-item-main column">
+          {{if .ArchivedAt}}
+            <a class="board-link" href="/b/{{.BoardSlug}}/archive">{{.Title}}</a>
+            <span class="board-meta">{{.BoardName}} › {{.Lane}} · archived</span>
+          {{else}}
+            <a class="board-link" href="/b/{{.BoardSlug}}#card-{{.ID}}">{{.Title}}</a>
+            <span class="board-meta">{{.BoardName}} › {{.Lane}}{{with due .Due}} · <span class="due due-{{.State}}">due {{.Label}}</span>{{end}}</span>
+          {{end}}
+        </div>
+      </li>
+    {{else}}
+      <li class="board-item empty">No card has all of those words.</li>
+    {{end}}
+  </ul>
+  {{if .Truncated}}<p class="search-scope">Showing the first {{len .Hits}}; add a word to narrow it down.</p>{{end}}
+  {{end}}
+</div>
+<script src="{{asset "app.js"}}"></script>
+</body>
+</html>
+{{end}}

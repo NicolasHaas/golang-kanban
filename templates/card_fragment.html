@@ -1,37 +1,60 @@
 {{define "card_fragment.html"}}
-<div class="bg-white dark:bg-gray-700 rounded-lg p-4 shadow-md border border-gray-200 dark:border-gray-600 cursor-move hover:shadow-lg transition-all duration-200 transform hover:scale-[1.02]" id="card-{{.ID}}" data-id="{{.ID}}">
-  <h5 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{.Title}}</h5>
+<div class="card" id="card-{{.ID}}" data-id="{{.ID}}">
+  <h5 class="card-title">{{.Title}}</h5>
   {{if .Description}}
-    <p class="text-gray-600 dark:text-gray-300 text-sm mb-3 whitespace-pre-wrap">{{.Description}}</p>
+    <p class="card-desc">{{linkify .Description}}</p>
   {{end}}
-  {{if .Subtasks}}
-    <ul class="space-y-1 mb-3">
-      {{range $line := split .Subtasks "\n"}}
-        {{$line = trim $line}}
-        {{if $line}}
-          {{$parts := split $line "|"}}
-          <li class="flex items-center text-sm">
-            <i class="bi bi-check-square{{if eq (index $parts 0) "1"}}-fill text-green-500{{else}} text-gray-400{{end}} mr-2"></i>
-            <span class="{{if eq (index $parts 0) "1"}}line-through text-gray-500{{else}}text-gray-700 dark:text-gray-300{{end}}">{{index $parts 1}}</span>
-          </li>
-        {{end}}
+  {{with .SubtaskList}}
+    {{/* Each line is a form that asks for the state the click wants, with
+         the text it was clicked on, so a repeated or stale click cannot tick
+         the wrong line or undo itself. */}}
+    <ul class="subtasks">
+      {{range $i, $s := .}}
+        <li>
+          <form hx-post="/card/{{$.ID}}/subtask" hx-target="#card-{{$.ID}}" hx-swap="outerHTML" hx-disabled-elt="find button">
+            <input type="hidden" name="index" value="{{$i}}">
+            <input type="hidden" name="text" value="{{$s.Text}}">
+            <input type="hidden" name="done" value="{{if $s.Done}}0{{else}}1{{end}}">
+            <button type="submit" class="subtask{{if $s.Done}} done{{end}}" title="{{if $s.Done}}Mark as not done{{else}}Mark as done{{end}}">
+              <i class="bi bi-check-square{{if $s.Done}}-fill{{end}}"></i>
+              <span>{{$s.Text}}</span>
+            </button>
+          </form>
+        </li>
       {{end}}
     </ul>
   {{end}}
-  <div class="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-600">
-    <button class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors duration-200"
+  {{$due := due .Due}}
+  {{if or $due (and assigning .Assignee)}}
+  <div class="card-meta">
+    {{with $due}}
+      <span class="due due-{{.State}}" title="Due {{.Date}}"><i class="bi bi-calendar-event"></i> {{.Label}}</span>
+    {{end}}
+    {{if and assigning .Assignee}}
+      <span class="assignee" title="Assigned to {{.Assignee}}">
+        <span class="avatar">{{initials .Assignee}}</span><span>{{localpart .Assignee}}</span>
+      </span>
+    {{end}}
+  </div>
+  {{end}}
+  <div class="card-actions">
+    <button type="button" class="icon-btn edit"
       hx-get="/card/{{.ID}}/edit"
       hx-target="#editCardModalContent"
       hx-swap="innerHTML"
-      title="Edit">
-      <i class="bi bi-pencil text-sm"></i>
+      title="Edit" aria-label="Edit">
+      <i class="bi bi-pencil"></i>
     </button>
-    <button class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors duration-200"
-      hx-post="/card/{{.ID}}/delete"
-      hx-target="#card-{{.ID}}"
-      hx-swap="delete"
-      title="Delete">
-      <i class="bi bi-trash text-sm"></i>
+    {{/* Phone only: move to the column on either side, which is another tab. */}}
+    <button type="button" class="icon-btn edit move-btn move-left" data-move="-1" title="Move to the column on the left" aria-label="Move to the column on the left">
+      <i class="bi bi-arrow-left"></i>
+    </button>
+    <button type="button" class="icon-btn edit move-btn move-right" data-move="1" title="Move to the column on the right" aria-label="Move to the column on the right">
+      <i class="bi bi-arrow-right"></i>
+    </button>
+    {{/* Archive, not delete: it can be undone, so it does not ask. */}}
+    <button type="button" class="icon-btn archive-btn" title="Archive" aria-label="Archive">
+      <i class="bi bi-archive"></i>
     </button>
   </div>
 </div>

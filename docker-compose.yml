@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
@@ -8,13 +7,24 @@ services:
       POSTGRES_DB: kanban
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d kanban"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
   kanban:
-    build:
-      dockerfile: Dockerfile
+    build: .
+    environment:
+      DB_HOST: postgres
+      DB_USER: user
+      DB_PASS: password
+      DB_NAME: kanban
     ports:
       - "17808:17808"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 volumes:
   postgres_data:
