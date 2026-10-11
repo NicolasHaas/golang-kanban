@@ -24,12 +24,16 @@ jobs:
         with:
           images: |
             ghcr.io/nicolashaas/golang-kanban
+          # Keep existing Unraid installs on their current :latest image.
+          flavor: |
+            latest=false
           # Generate tags based on:
           # - semver tag (e.g., v1.2.3) when present
           # - branch name for branch events
           # - commit SHA as a fallback
           tags: |
             type=semver,pattern={{version}}
+            type=semver,pattern=v{{major}}
             type=ref,event=branch
             type=sha
 
