@@ -16,7 +16,7 @@ It's a small Go app you can read in an evening. The web part is Go's standard li
 - Assignees, if you put a login like oauth2-proxy in front (see below).
 
 ### How it looks
-![Screenshot](assets/Screenshot_v1.0.0.png "Screenshot")
+![Moving-flat board with tasks, subtasks and due dates across four columns](assets/Screenshot_v2.png)
 
 ### Run it
 The quickest way is Docker with SQLite, so you don't need a database:
